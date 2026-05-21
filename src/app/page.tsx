@@ -75,27 +75,28 @@ export default function HomePage() {
       const camera = new THREE.PerspectiveCamera(42, W() / H(), 0.1, 100)
       camera.position.z = 2.2
 
-      // ── ЗІРКИ (5000, три розмірні рівні) ──────────────────────────────────
+      // ── ЗІРКИ — sizeAttenuation:false → розмір у пікселях ──────────────
       ;[
-        { count: 2500, size: 0.04, opacity: 0.8  },
-        { count: 1800, size: 0.08, opacity: 0.55 },
-        { count: 700,  size: 0.15, opacity: 0.35 },
+        { count: 2500, size: 1.0, opacity: 0.9  },
+        { count: 1500, size: 1.6, opacity: 0.65 },
+        { count: 500,  size: 2.4, opacity: 0.4  },
       ].forEach(({ count, size, opacity }) => {
         const pos = new Float32Array(count * 3)
-        for (let i = 0; i < count * 3; i++) pos[i] = (Math.random() - 0.5) * 120
+        for (let i = 0; i < count * 3; i++) pos[i] = (Math.random() - 0.5) * 80
         const geo = new THREE.BufferGeometry()
         geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
         scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
-          color: 0xffffff, size, transparent: true, opacity, sizeAttenuation: true,
+          color: 0xffffff, size, transparent: true, opacity,
+          sizeAttenuation: false,  // розмір у пікселях, незалежно від відстані
         })))
       })
 
-      // ── ТУМАННІСТЬ (кольорові хмари зірок) ───────────────────────────────
+      // ── ТУМАННІСТЬ — теж у пікселях ──────────────────────────────────────
       ;[
-        { color: 0x1a3a8f, count: 180, spread: 45, ox: 28,  oy: 14,  oz: -65 },
-        { color: 0x8f1a3a, count: 120, spread: 32, ox: -32, oy: -10, oz: -75 },
-        { color: 0x1a5f8f, count: 150, spread: 38, ox: 10,  oy: -20, oz: -58 },
-        { color: 0x3a1a8f, count: 90,  spread: 28, ox: -18, oy: 22,  oz: -80 },
+        { color: 0x3a6abf, count: 200, spread: 40, ox: 28,  oy: 14,  oz: -60 },
+        { color: 0xbf3a5a, count: 140, spread: 30, ox: -30, oy: -8,  oz: -70 },
+        { color: 0x3a9fbf, count: 160, spread: 35, ox: 10,  oy: -18, oz: -55 },
+        { color: 0x6a3abf, count: 100, spread: 25, ox: -16, oy: 20,  oz: -75 },
       ].forEach(({ color, count, spread, ox, oy, oz }) => {
         const pos = new Float32Array(count * 3)
         for (let i = 0; i < count; i++) {
@@ -106,7 +107,7 @@ export default function HomePage() {
         const geo = new THREE.BufferGeometry()
         geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
         scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
-          color, size: 0.3, transparent: true, opacity: 0.18, sizeAttenuation: true,
+          color, size: 1.8, transparent: true, opacity: 0.35, sizeAttenuation: false,
         })))
       })
 
@@ -122,7 +123,7 @@ export default function HomePage() {
 
       const globeGeo = new THREE.SphereGeometry(1, 64, 64)
       const globeMat = new THREE.MeshPhongMaterial({
-        color: 0x0a1628,
+        color: 0x1a3a6e,   // видимий синій поки текстури грузяться
         shininess: 10,
       })
       const globeMesh = new THREE.Mesh(globeGeo, globeMat)
@@ -154,7 +155,8 @@ export default function HomePage() {
 
       // ── ТЕКСТУРИ (асинхронно) ─────────────────────────────────────────────
       const loader = new THREE.TextureLoader()
-      const BASE = 'https://unpkg.com/three-globe/example/img/'
+      // jsdelivr + pinned version — надійніше за unpkg без версії
+      const BASE = 'https://cdn.jsdelivr.net/npm/three-globe@2.31.0/example/img/'
       let cloudMesh: THREE.Mesh | null = null
 
       Promise.all([
@@ -163,8 +165,8 @@ export default function HomePage() {
         loader.loadAsync(BASE + 'earth-clouds.png'),
       ]).then(([dayTex, bumpTex, cloudTex]) => {
         const mat = globeMesh.material as THREE.MeshPhongMaterial
-        mat.map      = dayTex
-        mat.bumpMap  = bumpTex
+        mat.map       = dayTex
+        mat.bumpMap   = bumpTex
         mat.bumpScale = 0.05
         mat.specular  = new THREE.Color(0x222233)
         mat.shininess = 12
@@ -181,7 +183,17 @@ export default function HomePage() {
           })
         )
         group.add(cloudMesh)
-      }).catch(() => { /* fall back to colour globe */ })
+      }).catch((err) => {
+        console.warn('Textures failed, using fallback:', err)
+        // Fallback: сітка меридіанів щоб глобус не виглядав порожнім
+        const wireframe = new THREE.Mesh(
+          new THREE.SphereGeometry(1.001, 24, 24),
+          new THREE.MeshBasicMaterial({
+            color: 0x1a4a8a, wireframe: true, transparent: true, opacity: 0.15,
+          })
+        )
+        group.add(wireframe)
+      })
 
       // ── МІСЯЦЬ ────────────────────────────────────────────────────────────
       const moonOrbit = new THREE.Group()
