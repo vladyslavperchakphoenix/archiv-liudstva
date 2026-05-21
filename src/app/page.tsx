@@ -315,6 +315,7 @@ export default function HomePage() {
 
       let allFeatures: any[] = []
       const countryBorders = new Map<string, THREE.LineSegments>()
+      const countryFillMap = new Map<string, THREE.Mesh>()
 
       function addRing(ring: number[][], target: number[]) {
         for (let i = 0; i < ring.length - 1; i++) {
@@ -330,6 +331,33 @@ export default function HomePage() {
           latLonToXyz(ring[i][0], ring[i][1])
           latLonToXyz(ring[i + 1][0], ring[i + 1][1])
         }
+      }
+
+      function llToXYZ(lon: number, lat: number, r: number): number[] {
+        const phi   = (90 - lat) * Math.PI / 180
+        const theta = (lon + 180) * Math.PI / 180
+        return [
+          -r * Math.sin(phi) * Math.cos(theta),
+           r * Math.cos(phi),
+           r * Math.sin(phi) * Math.sin(theta),
+        ]
+      }
+
+      function triangulateRings(rings: number[][][]): Float32Array {
+        const verts: number[] = []
+        for (const ring of rings) {
+          if (ring.length < 4) continue
+          let cx = 0, cy = 0
+          for (const p of ring) { cx += p[0]; cy += p[1] }
+          cx /= ring.length; cy /= ring.length
+          const cent = llToXYZ(cx, cy, 1.002)
+          for (let i = 0; i < ring.length - 1; i++) {
+            const a = llToXYZ(ring[i][0], ring[i][1], 1.002)
+            const b = llToXYZ(ring[i + 1][0], ring[i + 1][1], 1.002)
+            verts.push(...cent, ...a, ...b)
+          }
+        }
+        return new Float32Array(verts)
       }
 
       const crimea: number[][] = [
@@ -370,6 +398,25 @@ export default function HomePage() {
             lines.renderOrder = 1
             group.add(lines)
             countryBorders.set(id, lines)
+
+            // ── ЗАЛИВКА ────────────────────────────────────────────────
+            const totalPts = rings.reduce((s: number, r: number[][]) => s + r.length, 0)
+            if (totalPts >= 10 && countryFillMap.size < 250) {
+              const triPos = triangulateRings(rings)
+              if (triPos.length > 0) {
+                const fillGeo = new THREE.BufferGeometry()
+                fillGeo.setAttribute('position', new THREE.BufferAttribute(triPos, 3))
+                const fillMat = new THREE.MeshBasicMaterial({
+                  color: NATION_COLORS[id] ? new THREE.Color(NATION_COLORS[id]) : new THREE.Color(0xffffff),
+                  transparent: true, opacity: 0,
+                  side: THREE.DoubleSide, depthWrite: false,
+                })
+                const fillMesh = new THREE.Mesh(fillGeo, fillMat)
+                fillMesh.renderOrder = 2
+                group.add(fillMesh)
+                countryFillMap.set(id, fillMesh)
+              }
+            }
           }
         })
         .catch(e => console.error('Map error:', e))
@@ -545,6 +592,13 @@ export default function HomePage() {
         moonAngle += 0.001
         moonOrbit.rotation.y = moonAngle
         moonOrbit.rotation.x = Math.sin(moonAngle * 0.4) * 0.12
+        countryFillMap.forEach((mesh, id) => {
+          const mat = mesh.material as THREE.MeshBasicMaterial
+          const target = id === hoveredId ? (NATION_COLORS[id] ? 0.35 : 0.15) : 0
+          if (Math.abs(mat.opacity - target) > 0.001) {
+            mat.opacity += (target - mat.opacity) * 0.12
+          }
+        })
         renderer.render(scene, camera)
       }
       animate()
