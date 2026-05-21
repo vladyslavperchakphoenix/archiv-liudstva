@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(ls .vercel)",
+      "Bash(cat vercel.json)",
+      "Bash(which vercel *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git commit *)",
+      "Bash(npm list *)",
+      "Read(//mnt/c/Users/Admin/**)",
+      "Bash(npm install *)",
+      "Bash(npm show *)",
+      "Bash(node -e \"const pkg = require\\('./package.json'\\); console.log\\('next:', pkg.dependencies.next, 'react:', pkg.dependencies.react\\)\")",
+      "Bash(npx next *)"
+    ]
+  }
+}

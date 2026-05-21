@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { NATIONS_DATA } from '@/lib/nations-data'
 
@@ -51,6 +52,8 @@ export default function HomePage() {
   const [activeNation, setActiveNation] = useState<string | null>(null)
   const [tooltip, setTooltip] = useState<Tooltip>(null)
   const [isMobile, setIsMobile] = useState(false)
+  const router = useRouter()
+  const routerRef = useRef(router)
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
@@ -58,6 +61,8 @@ export default function HomePage() {
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [])
+
+  useEffect(() => { routerRef.current = router }, [router])
 
   useEffect(() => {
     let animId: number
@@ -313,9 +318,12 @@ export default function HomePage() {
       const NATION_COLORS: Record<string, string> = {}
       Object.entries(NATIONS_DATA).forEach(([id, n]) => { NATION_COLORS[id] = n.color })
 
+      const earcutMod = await import('earcut')
+      const earcut = (earcutMod as any).default as (vertices: number[], holes?: number[], dimensions?: number) => number[]
+
       let allFeatures: any[] = []
       const countryBorders = new Map<string, THREE.LineSegments>()
-      const countryGlowMap = new Map<string, THREE.LineSegments[]>()
+      const countryFillMap = new Map<string, THREE.Mesh>()
 
       function addRing(ring: number[][], target: number[]) {
         for (let i = 0; i < ring.length - 1; i++) {
@@ -372,22 +380,45 @@ export default function HomePage() {
             group.add(lines)
             countryBorders.set(id, lines)
 
-            // ── GLOW ШАРИ (3 шари, AdditiveBlending) ──────────────────
-            const glowColor = new THREE.Color(NATION_COLORS[id] || '#ffd700')
-            const glowLayers: THREE.LineSegments[] = []
-            for (const rOrder of [3, 4, 5]) {
-              const gmat = new THREE.LineBasicMaterial({
-                color: glowColor,
-                transparent: true, opacity: 0,
-                blending: THREE.AdditiveBlending, depthWrite: false,
-              })
-              const gl = new THREE.LineSegments(bufGeo, gmat)
-              gl.visible = false
-              gl.renderOrder = rOrder
-              group.add(gl)
-              glowLayers.push(gl)
+            // ── FILL MESH (earcut, depthTest:false) ────────────────────
+            const pols = geo.type === 'Polygon' ? [geo.coordinates] : geo.coordinates as number[][][][]
+            const fPos: number[] = [], fIdx: number[] = []
+            for (const polygon of pols) {
+              const verts: number[] = [], holes: number[] = []
+              for (let r = 0; r < polygon.length; r++) {
+                const ring = polygon[r]
+                if (r > 0) holes.push(verts.length / 2)
+                for (let vi = 0; vi < ring.length - 1; vi++) verts.push(ring[vi][0], ring[vi][1])
+              }
+              if (verts.length < 6) continue
+              const tri = earcut(verts, holes.length ? holes : undefined, 2)
+              if (!tri.length) continue
+              const vOff = fPos.length / 3
+              for (let vi = 0; vi < verts.length; vi += 2) {
+                const phi = (90 - verts[vi + 1]) * Math.PI / 180
+                const tht = (verts[vi] + 180) * Math.PI / 180
+                fPos.push(
+                  -1.003 * Math.sin(phi) * Math.cos(tht),
+                   1.003 * Math.cos(phi),
+                   1.003 * Math.sin(phi) * Math.sin(tht)
+                )
+              }
+              for (const t of tri) fIdx.push(vOff + t)
             }
-            countryGlowMap.set(id, glowLayers)
+            if (fPos.length) {
+              const fillGeo = new THREE.BufferGeometry()
+              fillGeo.setAttribute('position', new THREE.Float32BufferAttribute(fPos, 3))
+              fillGeo.setIndex(fIdx)
+              fillGeo.computeBoundingSphere()
+              const fillMat = new THREE.MeshBasicMaterial({
+                color: new THREE.Color(NATION_COLORS[id] || '#ffd700'),
+                transparent: true, opacity: 0, depthTest: false, depthWrite: false,
+              })
+              const fillMesh = new THREE.Mesh(fillGeo, fillMat)
+              fillMesh.visible = false; fillMesh.renderOrder = 2
+              group.add(fillMesh)
+              countryFillMap.set(id, fillMesh)
+            }
           }
         })
         .catch(e => console.error('Map error:', e))
@@ -506,7 +537,12 @@ export default function HomePage() {
         const coords = getLatLon(e.clientX, e.clientY)
         if (!coords) return
         const id = findNation(coords.lat, coords.lon)
-        if (id) setActiveNation(id)
+        if (!id) return
+        if (NATIONS_DATA[id]) {
+          routerRef.current.push(`/nation/${id}`)
+        } else {
+          setActiveNation(id)
+        }
       }
       canvas!.addEventListener('click', onClick)
       cleanups.push(() => canvas!.removeEventListener('click', onClick))
@@ -563,20 +599,17 @@ export default function HomePage() {
         moonAngle += 0.001
         moonOrbit.rotation.y = moonAngle
         moonOrbit.rotation.x = Math.sin(moonAngle * 0.4) * 0.12
-        // Lerp glow layer opacities (три шари: inner/mid/outer)
-        const GLOW_T = [0.9, 0.4, 0.15] as const
-        countryGlowMap.forEach((layers, id) => {
+        // Lerp fill mesh opacity
+        countryFillMap.forEach((mesh, id) => {
           const active = id === hoveredId
-          layers.forEach((gl, i) => {
-            const mat = gl.material as THREE.LineBasicMaterial
-            const tgt = active ? GLOW_T[i] : 0
-            if (Math.abs(mat.opacity - tgt) > 0.001) {
-              mat.opacity += (tgt - mat.opacity) * 0.15
-              gl.visible = mat.opacity > 0.005
-            } else if (!active) {
-              gl.visible = false
-            }
-          })
+          const mat = mesh.material as THREE.MeshBasicMaterial
+          const tgt = active ? 0.3 : 0
+          if (Math.abs(mat.opacity - tgt) > 0.001) {
+            mat.opacity += (tgt - mat.opacity) * 0.12
+            mesh.visible = mat.opacity > 0.005
+          } else if (!active) {
+            mesh.visible = false
+          }
         })
         renderer.render(scene, camera)
       }

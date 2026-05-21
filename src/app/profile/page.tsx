@@ -10,13 +10,30 @@ export default function ProfilePage() {
   const [message, setMessage] = useState('')
   const [user, setUser] = useState<any>(null)
   const [mode, setMode] = useState<'login' | 'register'>('login')
-
-  const supabase = createClient()
+  const [plan, setPlan] = useState<'free' | 'premium'>('free')
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user)
-    })
+    const loadUser = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (!user) return
+      setUser(user)
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('plan')
+        .eq('id', user.id)
+        .single()
+
+      console.log('plan result:', data, error)
+
+      if (data?.plan) {
+        setPlan(data.plan as 'free' | 'premium')
+      }
+    }
+
+    loadUser()
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -24,57 +41,155 @@ export default function ProfilePage() {
     setLoading(true)
     setMessage('')
 
+    const supabase = createClient()
+
     if (mode === 'register') {
       const { error } = await supabase.auth.signUp({ email, password })
       if (error) setMessage(`Помилка: ${error.message}`)
       else setMessage('Акаунт створено! Тепер увійдіть.')
     } else {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) setMessage(`Помилка: ${error.message}`)
-      else setUser(data.user)
+      if (error) {
+        setMessage(`Помилка: ${error.message}`)
+      } else {
+        setUser(data.user)
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('plan')
+          .eq('id', data.user.id)
+          .single()
+        console.log('plan result:', profile, profileError)
+        if (profile?.plan) setPlan(profile.plan as 'free' | 'premium')
+      }
     }
 
     setLoading(false)
   }
 
   const handleLogout = async () => {
+    const supabase = createClient()
     await supabase.auth.signOut()
     setUser(null)
+    setPlan('free')
   }
 
   if (user) return (
     <div style={{
       minHeight: '100vh', background: '#04080f',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px'
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px',
     }}>
       <div style={{ width: '100%', maxWidth: '360px', textAlign: 'center' }}>
+
+        {/* Avatar */}
         <div style={{
           width: '64px', height: '64px', borderRadius: '50%',
-          background: 'rgba(55,138,221,0.15)', border: '1px solid rgba(55,138,221,0.3)',
+          background: plan === 'premium' ? 'rgba(255,215,0,0.12)' : 'rgba(55,138,221,0.15)',
+          border: plan === 'premium' ? '1px solid rgba(255,215,0,0.35)' : '1px solid rgba(55,138,221,0.3)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          margin: '0 auto 20px', fontSize: '24px'
-        }}>👤</div>
+          margin: '0 auto 20px', fontSize: '24px',
+        }}>
+          {plan === 'premium' ? '✦' : '👤'}
+        </div>
+
         <h1 style={{ color: 'white', fontSize: '1.4rem', fontWeight: 400, marginBottom: '8px' }}>
           Вітаємо!
         </h1>
-        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', marginBottom: '32px' }}>
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', marginBottom: '28px' }}>
           {user.email}
         </p>
-        <div style={{
-          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: '12px', padding: '20px', marginBottom: '24px', textAlign: 'left'
-        }}>
-          <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '8px' }}>
-            План
-          </p>
-          <p style={{ color: 'white', fontSize: '14px' }}>Free</p>
-        </div>
+
+        {/* Plan block */}
+        {plan === 'premium' ? (
+          <div style={{
+            background: 'rgba(255,215,0,0.08)',
+            border: '1px solid rgba(255,215,0,0.25)',
+            borderRadius: '12px',
+            padding: '20px',
+            marginBottom: '24px',
+            textAlign: 'left',
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginBottom: '10px',
+            }}>
+              <span style={{
+                fontSize: '10px', letterSpacing: '0.14em', textTransform: 'uppercase',
+                color: 'rgba(255,255,255,0.3)', fontWeight: 600,
+              }}>
+                План
+              </span>
+              <span style={{
+                fontSize: '11px', letterSpacing: '0.1em', fontWeight: 700,
+                color: '#ffd700', textTransform: 'uppercase',
+              }}>
+                Premium ✓
+              </span>
+            </div>
+            <div style={{
+              background: 'rgba(255,215,0,0.1)',
+              border: '1px solid rgba(255,215,0,0.3)',
+              borderRadius: '8px',
+              padding: '16px',
+            }}>
+              <div style={{ color: '#ffd700', fontSize: '12px', letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600 }}>
+                PREMIUM
+              </div>
+              <div style={{ color: 'white', fontSize: '14px', marginTop: '6px' }}>
+                Повний доступ до архіву
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginTop: '4px', lineHeight: 1.5 }}>
+                Всі нації · Персоналії · Культурний код
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '12px',
+            padding: '20px',
+            marginBottom: '24px',
+            textAlign: 'left',
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginBottom: '12px',
+            }}>
+              <span style={{
+                fontSize: '10px', letterSpacing: '0.14em', textTransform: 'uppercase',
+                color: 'rgba(255,255,255,0.3)', fontWeight: 600,
+              }}>
+                План
+              </span>
+              <span style={{
+                fontSize: '11px', letterSpacing: '0.08em', fontWeight: 600,
+                color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase',
+              }}>
+                Free
+              </span>
+            </div>
+            <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '13px', lineHeight: 1.55, marginBottom: '14px' }}>
+              Базовий доступ. Перші 3 пункти матриці, по одному прикладу спадку та одна персоналія на націю.
+            </p>
+            <button style={{
+              width: '100%', padding: '10px 16px',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: '8px',
+              color: 'rgba(255,255,255,0.6)', fontSize: '13px',
+              cursor: 'pointer',
+            }}>
+              Оновити до Premium →
+            </button>
+          </div>
+        )}
+
         <button
           onClick={handleLogout}
           style={{
             width: '100%', padding: '12px', borderRadius: '8px',
-            background: 'transparent', border: '1px solid rgba(255,255,255,0.15)',
-            color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: '14px',
+            background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
+            color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '14px',
           }}
         >
           Вийти
@@ -86,10 +201,14 @@ export default function ProfilePage() {
   return (
     <div style={{
       minHeight: '100vh', background: '#04080f',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px'
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px',
     }}>
       <div style={{ width: '100%', maxWidth: '360px' }}>
-        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: '32px', textAlign: 'center' }}>
+        <p style={{
+          color: 'rgba(255,255,255,0.3)', fontSize: '11px',
+          letterSpacing: '0.2em', textTransform: 'uppercase',
+          marginBottom: '32px', textAlign: 'center',
+        }}>
           Архів Людства
         </p>
 
