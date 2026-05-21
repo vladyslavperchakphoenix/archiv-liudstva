@@ -50,14 +50,22 @@ export default function HomePage() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [activeNation, setActiveNation] = useState<string | null>(null)
   const [tooltip, setTooltip] = useState<Tooltip>(null)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   useEffect(() => {
     let animId: number
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const W = () => window.innerWidth
-    const H = () => window.innerHeight
+    const W = () => (canvas as HTMLCanvasElement).clientWidth || window.innerWidth
+    const H = () => (canvas as HTMLCanvasElement).clientHeight || window.innerHeight
 
     const cleanups: (() => void)[] = []
 
@@ -153,47 +161,59 @@ export default function HomePage() {
         })
       ))
 
-      // ── ТЕКСТУРИ (асинхронно) ─────────────────────────────────────────────
+      // ── ТЕКСТУРИ (каскад URL → Fresnel fallback) ──────────────────────────
       const loader = new THREE.TextureLoader()
-      // jsdelivr + pinned version — надійніше за unpkg без версії
-      const BASE = 'https://cdn.jsdelivr.net/npm/three-globe@2.31.0/example/img/'
-      let cloudMesh: THREE.Mesh | null = null
 
-      Promise.all([
-        loader.loadAsync(BASE + 'earth-blue-marble.jpg'),
-        loader.loadAsync(BASE + 'earth-topology.png'),
-        loader.loadAsync(BASE + 'earth-clouds.png'),
-      ]).then(([dayTex, bumpTex, cloudTex]) => {
+      const earthUrls = [
+        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/planets/earth_atmos_2048.jpg',
+        'https://raw.githubusercontent.com/turban/webgl-earth/master/images/2_no_clouds_4k.jpg',
+        'https://cdn.jsdelivr.net/npm/three-globe@2.31.0/example/img/earth-blue-marble.jpg',
+      ]
+
+      let textureLoaded = false
+      let textureTimeoutId: ReturnType<typeof setTimeout>
+
+      const applyTexture = (tex: THREE.Texture) => {
+        textureLoaded = true
+        clearTimeout(textureTimeoutId)
         const mat = globeMesh.material as THREE.MeshPhongMaterial
-        mat.map       = dayTex
-        mat.bumpMap   = bumpTex
-        mat.bumpScale = 0.05
-        mat.specular  = new THREE.Color(0x222233)
+        mat.map = tex
+        mat.specular = new THREE.Color(0x222233)
         mat.shininess = 12
         mat.color.set(0xffffff)
         mat.needsUpdate = true
+      }
 
-        cloudMesh = new THREE.Mesh(
-          new THREE.SphereGeometry(1.006, 64, 64),
-          new THREE.MeshPhongMaterial({
-            map: cloudTex,
-            transparent: true,
-            opacity: 0.28,
-            depthWrite: false,
-          })
-        )
-        group.add(cloudMesh)
-      }).catch((err) => {
-        console.warn('Textures failed, using fallback:', err)
-        // Fallback: сітка меридіанів щоб глобус не виглядав порожнім
-        const wireframe = new THREE.Mesh(
-          new THREE.SphereGeometry(1.001, 24, 24),
-          new THREE.MeshBasicMaterial({
-            color: 0x1a4a8a, wireframe: true, transparent: true, opacity: 0.15,
-          })
-        )
-        group.add(wireframe)
-      })
+      const applyFresnel = () => {
+        if (textureLoaded) return
+        globeMesh.material = new THREE.ShaderMaterial({
+          vertexShader: `
+            varying vec3 vNormal;
+            void main() {
+              vNormal = normalize(normalMatrix * normal);
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+          `,
+          fragmentShader: `
+            varying vec3 vNormal;
+            void main() {
+              float rim = pow(0.75 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.5);
+              vec3 deep  = vec3(0.04, 0.09, 0.16);
+              vec3 glow  = vec3(0.15, 0.45, 1.0);
+              gl_FragColor = vec4(mix(deep, glow, rim), 1.0);
+            }
+          `,
+        })
+      }
+
+      const tryLoadTexture = (i: number) => {
+        if (i >= earthUrls.length) { applyFresnel(); return }
+        loader.load(earthUrls[i], applyTexture, undefined, () => tryLoadTexture(i + 1))
+      }
+      tryLoadTexture(0)
+
+      textureTimeoutId = setTimeout(applyFresnel, 3000)
+      cleanups.push(() => clearTimeout(textureTimeoutId))
 
       // ── МІСЯЦЬ ────────────────────────────────────────────────────────────
       const moonOrbit = new THREE.Group()
@@ -438,7 +458,6 @@ export default function HomePage() {
           rotY += 0.0005
           group.rotation.set(rotX, rotY, 0)
         }
-        if (cloudMesh) cloudMesh.rotation.y += 0.00015
         moonAngle += 0.001
         moonOrbit.rotation.y = moonAngle
         moonOrbit.rotation.x = Math.sin(moonAngle * 0.4) * 0.12
@@ -463,7 +482,7 @@ export default function HomePage() {
   return (
     <>
       {/* ── CANVAS ── */}
-      <div style={{ position: 'fixed', inset: 0 }}>
+      <div style={{ position: 'fixed', top: 0, bottom: 0, left: isMobile ? 0 : 220, right: 0 }}>
         <canvas
           ref={canvasRef}
           style={{ width: '100%', height: '100%', display: 'block', cursor: 'grab' }}
