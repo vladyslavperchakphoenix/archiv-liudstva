@@ -337,23 +337,33 @@ export default function HomePage() {
 
   return (
     <>
-      <div style={{ position: 'fixed', top: 0, bottom: 0, left: '220px', right: 0 }}>
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+      }}>
         <canvas
           ref={canvasRef}
           style={{ width: '100%', height: '100%', display: 'block', cursor: 'grab' }}
         />
       </div>
 
+      {/* Панель нації */}
       <div style={{
-        position: 'fixed', top: 0, right: 0, bottom: 0,
-        width: '360px',
+        position: 'fixed',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        width: 'min(360px, 100vw)',
         background: 'rgba(4,8,15,0.97)',
         borderLeft: '1px solid rgba(255,255,255,0.08)',
         transform: nation ? 'translateX(0)' : 'translateX(100%)',
         transition: 'transform 0.35s cubic-bezier(0.4,0,0.2,1)',
         zIndex: 30,
         overflowY: 'auto',
-        padding: '40px 28px',
+        padding: '40px 28px 100px',
       }}>
         <button
           onClick={() => setActiveNation(null)}
@@ -418,4 +428,3 @@ export default function HomePage() {
       </div>
     </>
   )
-}

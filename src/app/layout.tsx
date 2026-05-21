@@ -12,7 +12,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="uk">
       <body>
         <Navigation />
-        <main style={{ paddingBottom: '80px', minHeight: '100vh' }} className="md:pl-60">
+        <main style={{ paddingBottom: '80px', paddingLeft: 0 }}>
           {children}
         </main>
       </body>
