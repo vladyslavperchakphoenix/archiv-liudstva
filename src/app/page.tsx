@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import earcut from 'earcut'
 import { NATIONS_DATA } from '@/lib/nations-data'
 
 const COUNTRY_NAMES: Record<string, string> = {
@@ -316,7 +315,7 @@ export default function HomePage() {
 
       let allFeatures: any[] = []
       const countryBorders = new Map<string, THREE.LineSegments>()
-      const countryFillMap = new Map<string, THREE.Mesh>()
+      const countryGlowMap = new Map<string, THREE.LineSegments[]>()
 
       function addRing(ring: number[][], target: number[]) {
         for (let i = 0; i < ring.length - 1; i++) {
@@ -332,46 +331,6 @@ export default function HomePage() {
           latLonToXyz(ring[i][0], ring[i][1])
           latLonToXyz(ring[i + 1][0], ring[i + 1][1])
         }
-      }
-
-      function llToXYZ(lon: number, lat: number, r: number): number[] {
-        const phi   = (90 - lat) * Math.PI / 180
-        const theta = (lon + 180) * Math.PI / 180
-        return [
-          -r * Math.sin(phi) * Math.cos(theta),
-           r * Math.cos(phi),
-           r * Math.sin(phi) * Math.sin(theta),
-        ]
-      }
-
-      // earcut тріангуляція — правильно обробляє невипуклі полігони і дірки
-      function buildFillGeometry(geom: any): Float32Array {
-        const all: number[] = []
-        // Нормалізуємо до масиву полігонів [exterior, ...holes]
-        const polygons: number[][][][] =
-          geom.type === 'Polygon' ? [geom.coordinates] : geom.coordinates
-
-        for (const polygon of polygons) {
-          if (!polygon.length || polygon[0].length < 3) continue
-          const exterior = polygon[0]
-          const holes    = polygon.slice(1)
-
-          // Плаский масив 2D координат для earcut
-          const flat2d: number[]  = []
-          const holeIdx: number[] = []
-          exterior.forEach(([lon, lat]: number[]) => flat2d.push(lon, lat))
-          for (const hole of holes) {
-            holeIdx.push(flat2d.length / 2)
-            hole.forEach(([lon, lat]: number[]) => flat2d.push(lon, lat))
-          }
-
-          const indices = earcut(flat2d, holeIdx.length ? holeIdx : undefined, 2)
-          for (const idx of indices) {
-            const [x, y, z] = llToXYZ(flat2d[idx * 2], flat2d[idx * 2 + 1], 1.005)
-            all.push(x, y, z)
-          }
-        }
-        return new Float32Array(all)
       }
 
       const crimea: number[][] = [
@@ -413,29 +372,23 @@ export default function HomePage() {
             group.add(lines)
             countryBorders.set(id, lines)
 
-            // ── ЗАЛИВКА (earcut) ───────────────────────────────────────
-            if (countryFillMap.size < 250) {
-              const triPos = buildFillGeometry(f.geometry)
-              if (triPos.length > 0) {
-                const fillGeo = new THREE.BufferGeometry()
-                fillGeo.setAttribute('position', new THREE.BufferAttribute(triPos, 3))
-                fillGeo.computeBoundingSphere()
-                const fillMat = new THREE.MeshBasicMaterial({
-                  color: NATION_COLORS[id]
-                    ? new THREE.Color(NATION_COLORS[id])
-                    : new THREE.Color(0xffd700),
-                  transparent: true, opacity: 0,
-                  side: THREE.DoubleSide, depthWrite: false,
-                  polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
-                })
-                const fillMesh = new THREE.Mesh(fillGeo, fillMat)
-                fillMesh.renderOrder = 2
-                group.add(fillMesh)
-                countryFillMap.set(id, fillMesh)
-              }
+            // ── GLOW ШАРИ (3 шари, AdditiveBlending) ──────────────────
+            const glowColor = new THREE.Color(NATION_COLORS[id] || '#ffd700')
+            const glowLayers: THREE.LineSegments[] = []
+            for (const rOrder of [3, 4, 5]) {
+              const gmat = new THREE.LineBasicMaterial({
+                color: glowColor,
+                transparent: true, opacity: 0,
+                blending: THREE.AdditiveBlending, depthWrite: false,
+              })
+              const gl = new THREE.LineSegments(bufGeo, gmat)
+              gl.visible = false
+              gl.renderOrder = rOrder
+              group.add(gl)
+              glowLayers.push(gl)
             }
+            countryGlowMap.set(id, glowLayers)
           }
-          console.log('Fill meshes created:', countryFillMap.size)
         })
         .catch(e => console.error('Map error:', e))
 
@@ -488,7 +441,6 @@ export default function HomePage() {
           if (prev) { (prev.material as THREE.LineBasicMaterial).opacity = 0; prev.visible = false }
         }
         hoveredId = id
-        console.log('Hovered:', hoveredId, hoveredId ? countryFillMap.has(hoveredId) : false)
         if (id) {
           const lines = countryBorders.get(id)
           if (lines) { lines.visible = true; (lines.material as THREE.LineBasicMaterial).opacity = 0.85 }
@@ -611,12 +563,20 @@ export default function HomePage() {
         moonAngle += 0.001
         moonOrbit.rotation.y = moonAngle
         moonOrbit.rotation.x = Math.sin(moonAngle * 0.4) * 0.12
-        countryFillMap.forEach((mesh, id) => {
-          const mat = mesh.material as THREE.MeshBasicMaterial
-          const target = id === hoveredId ? (NATION_COLORS[id] ? 0.35 : 0.25) : 0
-          if (Math.abs(mat.opacity - target) > 0.001) {
-            mat.opacity += (target - mat.opacity) * 0.18
-          }
+        // Lerp glow layer opacities (три шари: inner/mid/outer)
+        const GLOW_T = [0.9, 0.4, 0.15] as const
+        countryGlowMap.forEach((layers, id) => {
+          const active = id === hoveredId
+          layers.forEach((gl, i) => {
+            const mat = gl.material as THREE.LineBasicMaterial
+            const tgt = active ? GLOW_T[i] : 0
+            if (Math.abs(mat.opacity - tgt) > 0.001) {
+              mat.opacity += (tgt - mat.opacity) * 0.15
+              gl.visible = mat.opacity > 0.005
+            } else if (!active) {
+              gl.visible = false
+            }
+          })
         })
         renderer.render(scene, camera)
       }
