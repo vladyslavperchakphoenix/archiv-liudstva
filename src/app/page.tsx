@@ -350,10 +350,10 @@ export default function HomePage() {
           let cx = 0, cy = 0
           for (const p of ring) { cx += p[0]; cy += p[1] }
           cx /= ring.length; cy /= ring.length
-          const cent = llToXYZ(cx, cy, 1.002)
+          const cent = llToXYZ(cx, cy, 1.005)
           for (let i = 0; i < ring.length - 1; i++) {
-            const a = llToXYZ(ring[i][0], ring[i][1], 1.002)
-            const b = llToXYZ(ring[i + 1][0], ring[i + 1][1], 1.002)
+            const a = llToXYZ(ring[i][0], ring[i][1], 1.005)
+            const b = llToXYZ(ring[i + 1][0], ring[i + 1][1], 1.005)
             verts.push(...cent, ...a, ...b)
           }
         }
@@ -406,10 +406,12 @@ export default function HomePage() {
               if (triPos.length > 0) {
                 const fillGeo = new THREE.BufferGeometry()
                 fillGeo.setAttribute('position', new THREE.BufferAttribute(triPos, 3))
+                fillGeo.computeBoundingSphere()
                 const fillMat = new THREE.MeshBasicMaterial({
                   color: NATION_COLORS[id] ? new THREE.Color(NATION_COLORS[id]) : new THREE.Color(0xffffff),
                   transparent: true, opacity: 0,
                   side: THREE.DoubleSide, depthWrite: false,
+                  polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
                 })
                 const fillMesh = new THREE.Mesh(fillGeo, fillMat)
                 fillMesh.renderOrder = 2
@@ -418,6 +420,7 @@ export default function HomePage() {
               }
             }
           }
+          console.log('Fill meshes created:', countryFillMap.size)
         })
         .catch(e => console.error('Map error:', e))
 
@@ -470,6 +473,7 @@ export default function HomePage() {
           if (prev) { (prev.material as THREE.LineBasicMaterial).opacity = 0; prev.visible = false }
         }
         hoveredId = id
+        console.log('Hovered:', hoveredId, hoveredId ? countryFillMap.has(hoveredId) : false)
         if (id) {
           const lines = countryBorders.get(id)
           if (lines) { lines.visible = true; (lines.material as THREE.LineBasicMaterial).opacity = 0.85 }
@@ -594,9 +598,9 @@ export default function HomePage() {
         moonOrbit.rotation.x = Math.sin(moonAngle * 0.4) * 0.12
         countryFillMap.forEach((mesh, id) => {
           const mat = mesh.material as THREE.MeshBasicMaterial
-          const target = id === hoveredId ? (NATION_COLORS[id] ? 0.35 : 0.15) : 0
+          const target = id === hoveredId ? (NATION_COLORS[id] ? 0.45 : 0.22) : 0
           if (Math.abs(mat.opacity - target) > 0.001) {
-            mat.opacity += (target - mat.opacity) * 0.12
+            mat.opacity += (target - mat.opacity) * 0.18
           }
         })
         renderer.render(scene, camera)
