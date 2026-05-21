@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import earcut from 'earcut'
 import { NATIONS_DATA } from '@/lib/nations-data'
 
 const COUNTRY_NAMES: Record<string, string> = {
@@ -343,21 +344,34 @@ export default function HomePage() {
         ]
       }
 
-      function triangulateRings(rings: number[][][]): Float32Array {
-        const verts: number[] = []
-        for (const ring of rings) {
-          if (ring.length < 4) continue
-          let cx = 0, cy = 0
-          for (const p of ring) { cx += p[0]; cy += p[1] }
-          cx /= ring.length; cy /= ring.length
-          const cent = llToXYZ(cx, cy, 1.005)
-          for (let i = 0; i < ring.length - 1; i++) {
-            const a = llToXYZ(ring[i][0], ring[i][1], 1.005)
-            const b = llToXYZ(ring[i + 1][0], ring[i + 1][1], 1.005)
-            verts.push(...cent, ...a, ...b)
+      // earcut тріангуляція — правильно обробляє невипуклі полігони і дірки
+      function buildFillGeometry(geom: any): Float32Array {
+        const all: number[] = []
+        // Нормалізуємо до масиву полігонів [exterior, ...holes]
+        const polygons: number[][][][] =
+          geom.type === 'Polygon' ? [geom.coordinates] : geom.coordinates
+
+        for (const polygon of polygons) {
+          if (!polygon.length || polygon[0].length < 3) continue
+          const exterior = polygon[0]
+          const holes    = polygon.slice(1)
+
+          // Плаский масив 2D координат для earcut
+          const flat2d: number[]  = []
+          const holeIdx: number[] = []
+          exterior.forEach(([lon, lat]: number[]) => flat2d.push(lon, lat))
+          for (const hole of holes) {
+            holeIdx.push(flat2d.length / 2)
+            hole.forEach(([lon, lat]: number[]) => flat2d.push(lon, lat))
+          }
+
+          const indices = earcut(flat2d, holeIdx.length ? holeIdx : undefined, 2)
+          for (const idx of indices) {
+            const [x, y, z] = llToXYZ(flat2d[idx * 2], flat2d[idx * 2 + 1], 1.005)
+            all.push(x, y, z)
           }
         }
-        return new Float32Array(verts)
+        return new Float32Array(all)
       }
 
       const crimea: number[][] = [
@@ -399,16 +413,17 @@ export default function HomePage() {
             group.add(lines)
             countryBorders.set(id, lines)
 
-            // ── ЗАЛИВКА ────────────────────────────────────────────────
-            const totalPts = rings.reduce((s: number, r: number[][]) => s + r.length, 0)
-            if (totalPts >= 10 && countryFillMap.size < 250) {
-              const triPos = triangulateRings(rings)
+            // ── ЗАЛИВКА (earcut) ───────────────────────────────────────
+            if (countryFillMap.size < 250) {
+              const triPos = buildFillGeometry(f.geometry)
               if (triPos.length > 0) {
                 const fillGeo = new THREE.BufferGeometry()
                 fillGeo.setAttribute('position', new THREE.BufferAttribute(triPos, 3))
                 fillGeo.computeBoundingSphere()
                 const fillMat = new THREE.MeshBasicMaterial({
-                  color: new THREE.Color(0xffdd00),
+                  color: NATION_COLORS[id]
+                    ? new THREE.Color(NATION_COLORS[id])
+                    : new THREE.Color(0xffd700),
                   transparent: true, opacity: 0,
                   side: THREE.DoubleSide, depthWrite: false,
                   polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
@@ -598,7 +613,7 @@ export default function HomePage() {
         moonOrbit.rotation.x = Math.sin(moonAngle * 0.4) * 0.12
         countryFillMap.forEach((mesh, id) => {
           const mat = mesh.material as THREE.MeshBasicMaterial
-          const target = id === hoveredId ? 0.4 : 0
+          const target = id === hoveredId ? (NATION_COLORS[id] ? 0.35 : 0.25) : 0
           if (Math.abs(mat.opacity - target) > 0.001) {
             mat.opacity += (target - mat.opacity) * 0.18
           }
