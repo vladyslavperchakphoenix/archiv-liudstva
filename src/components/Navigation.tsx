@@ -4,9 +4,21 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
+const CATEGORIES = [
+  { icon: '🏛️', label: 'Філософія',  desc: 'Ідеї що змінили світ',       soon: true },
+  { icon: '🎭', label: 'Меми',        desc: 'Культурні коди епох',         soon: true },
+  { icon: '⚡', label: 'Технологія',  desc: 'Цивілізаційні стрибки',       soon: true },
+  { icon: '🎨', label: 'Мистецтво',   desc: 'Душа у формі і кольорі',      soon: true },
+  { icon: '📜', label: 'Релігія',     desc: 'Архетипи сакрального',        soon: true },
+  { icon: '⚔️', label: 'Конфлікти',  desc: 'Злами що переписали карту',   soon: true },
+  { icon: '🧬', label: 'Особистості', desc: 'Архетипічні постаті',         soon: true },
+  { icon: '🌐', label: 'Нації',       desc: 'Географія, душа і тінь',      soon: false, href: '/nation' },
+]
+
 export default function Navigation() {
   const pathname = usePathname()
   const [searchOpen, setSearchOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [isMobile, setIsMobile] = useState(false)
 
@@ -47,6 +59,15 @@ export default function Navigation() {
           background: rgba(255,255,255,0.05) !important;
           color: rgba(255,255,255,0.8) !important;
         }
+        @keyframes slideUp {
+          from { transform: translateX(100%); opacity: 0; }
+          to   { transform: translateX(0);    opacity: 1; }
+        }
+        .menu-sidebar {
+          animation: slideUp 0.28s cubic-bezier(0.4,0,0.2,1);
+        }
+        .category-row:hover .category-arrow { opacity: 1 !important; }
+        .category-row:active { background: rgba(255,255,255,0.06) !important; }
       `}</style>
 
       {/* ── ПОШУК ОВЕРЛЕЙ ── */}
@@ -178,6 +199,21 @@ export default function Navigation() {
             >
               <SearchIcon size={20} /> Пошук
             </button>
+
+            <button
+              onClick={() => setMenuOpen(true)}
+              className="desktop-nav-item"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '12px',
+                padding: '11px 14px', borderRadius: '8px',
+                background: menuOpen ? 'rgba(255,255,255,0.06)' : 'transparent',
+                border: 'none', cursor: 'pointer',
+                color: menuOpen ? 'white' : 'rgba(255,255,255,0.4)', fontSize: '14px',
+                width: '100%', textAlign: 'left', transition: 'all 0.15s',
+              }}
+            >
+              <MenuIcon size={20} /> Категорії
+            </button>
           </div>
 
           {/* Профіль */}
@@ -283,9 +319,193 @@ export default function Navigation() {
             Профіль
           </Link>
 
-          {/* Резерв */}
-          <div style={{ flex: 1 }} />
+          {/* Меню */}
+          <button
+            onClick={() => setMenuOpen(true)}
+            className="nav-side-btn"
+            style={{
+              flex: 1, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
+              gap: '4px', padding: '8px',
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              color: menuOpen ? 'white' : 'rgba(255,255,255,0.35)',
+              fontSize: '9px', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase',
+              transition: 'color 0.15s',
+            }}
+          >
+            <MenuIcon size={22} />
+            Ще
+          </button>
         </nav>
+      )}
+
+      {/* ── МЕНЮ САЙДБАР ── */}
+      {menuOpen && (
+        <>
+          {/* Overlay */}
+          <div
+            onClick={() => setMenuOpen(false)}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 50,
+              background: 'rgba(0,0,0,0.6)',
+              backdropFilter: 'blur(4px)',
+              WebkitBackdropFilter: 'blur(4px)',
+            }}
+          />
+
+          {/* Drawer */}
+          <div
+            className="menu-sidebar"
+            style={{
+              position: 'fixed', top: 0, right: 0, bottom: 0,
+              width: 'min(320px, 100vw)',
+              zIndex: 51,
+              background: '#04080f',
+              borderLeft: '1px solid rgba(255,255,255,0.08)',
+              display: 'flex', flexDirection: 'column',
+              overflowY: 'auto',
+            }}
+          >
+            {/* Шапка */}
+            <div style={{
+              padding: '28px 24px 20px',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <div>
+                <div style={{
+                  fontSize: '10px', letterSpacing: '0.2em', textTransform: 'uppercase',
+                  color: 'rgba(255,255,255,0.25)', marginBottom: '6px', fontWeight: 600,
+                }}>
+                  Архів Людства
+                </div>
+                <div style={{ color: 'white', fontSize: '18px', fontWeight: 300 }}>
+                  Категорії
+                </div>
+              </div>
+              <button
+                onClick={() => setMenuOpen(false)}
+                style={{
+                  width: '32px', height: '32px', borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  color: 'rgba(255,255,255,0.5)', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '18px', lineHeight: 1,
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Список категорій */}
+            <div style={{ flex: 1, padding: '12px 0' }}>
+              {CATEGORIES.map((cat) => {
+                const inner = (
+                  <div
+                    className="category-row"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '16px',
+                      padding: '14px 24px',
+                      background: 'transparent',
+                      transition: 'background 0.15s',
+                      cursor: cat.soon ? 'default' : 'pointer',
+                    }}
+                  >
+                    {/* Іконка */}
+                    <div style={{
+                      width: '40px', height: '40px', borderRadius: '10px',
+                      background: cat.soon ? 'rgba(255,255,255,0.04)' : 'rgba(55,138,221,0.1)',
+                      border: `1px solid ${cat.soon ? 'rgba(255,255,255,0.07)' : 'rgba(55,138,221,0.25)'}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '18px', flexShrink: 0,
+                      filter: cat.soon ? 'grayscale(0.4)' : 'none',
+                    }}>
+                      {cat.icon}
+                    </div>
+
+                    {/* Текст */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        color: cat.soon ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.9)',
+                        fontSize: '15px', fontWeight: 400, marginBottom: '2px',
+                      }}>
+                        {cat.label}
+                      </div>
+                      <div style={{
+                        color: 'rgba(255,255,255,0.25)', fontSize: '12px',
+                      }}>
+                        {cat.desc}
+                      </div>
+                    </div>
+
+                    {/* Бейдж / стрілка */}
+                    {cat.soon ? (
+                      <div style={{
+                        padding: '2px 8px',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '100px',
+                        fontSize: '9px', letterSpacing: '0.1em',
+                        color: 'rgba(255,255,255,0.2)',
+                        textTransform: 'uppercase', fontWeight: 600,
+                        flexShrink: 0,
+                      }}>
+                        Скоро
+                      </div>
+                    ) : (
+                      <div
+                        className="category-arrow"
+                        style={{
+                          color: '#60a5fa', opacity: 0.5,
+                          transition: 'opacity 0.15s', flexShrink: 0,
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                          stroke="currentColor" strokeWidth="2.5"
+                          strokeLinecap="round" strokeLinejoin="round"
+                        >
+                          <path d="m9 18 6-6-6-6"/>
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                )
+
+                return cat.href ? (
+                  <Link
+                    key={cat.label}
+                    href={cat.href}
+                    onClick={() => setMenuOpen(false)}
+                    style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}
+                  >
+                    {inner}
+                  </Link>
+                ) : (
+                  <div key={cat.label}>{inner}</div>
+                )
+              })}
+            </div>
+
+            {/* Футер */}
+            <div style={{
+              padding: '20px 24px',
+              borderTop: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <div style={{
+                fontSize: '12px', color: 'rgba(255,255,255,0.2)',
+                lineHeight: 1.5,
+              }}>
+                Архів поповнюється. Нові категорії з'являться у наступних релізах.
+              </div>
+              <div style={{
+                marginTop: '8px',
+                fontSize: '11px', color: 'rgba(255,255,255,0.12)',
+              }}>
+                v0.1 · alpha
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </>
   )
@@ -365,6 +585,18 @@ function ProfileIcon({ size }: { size: number }) {
     >
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
       <circle cx="12" cy="7" r="4"/>
+    </svg>
+  )
+}
+
+function MenuIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+    >
+      <line x1="4" y1="6"  x2="20" y2="6"/>
+      <line x1="4" y1="12" x2="14" y2="12"/>
+      <line x1="4" y1="18" x2="18" y2="18"/>
     </svg>
   )
 }
