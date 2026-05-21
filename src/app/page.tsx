@@ -211,7 +211,7 @@ export default function HomePage() {
       const mouse = new THREE.Vector2()
 
       function getLatLon(e: MouseEvent) {
-        const rect = canvas.getBoundingClientRect()
+        const rect = (canvas as HTMLCanvasElement).getBoundingClientRect()
         mouse.set(
           ((e.clientX - rect.left) / rect.width) * 2 - 1,
           -((e.clientY - rect.top) / rect.height) * 2 + 1
