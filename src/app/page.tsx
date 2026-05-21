@@ -1,19 +1,65 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { NATIONS_DATA } from '@/lib/nations-data'
+
+const COUNTRY_NAMES: Record<string, string> = {
+  '4': 'Афганістан', '8': 'Албанія', '12': 'Алжир', '20': 'Андорра',
+  '24': 'Ангола', '31': 'Азербайджан', '32': 'Аргентина', '36': 'Австралія',
+  '40': 'Австрія', '50': 'Бангладеш', '51': 'Вірменія', '56': 'Бельгія',
+  '64': 'Бутан', '68': 'Болівія', '70': 'Боснія і Герцеговина', '72': 'Ботсвана',
+  '84': 'Беліз', '100': 'Болгарія', '104': "М'янма", '108': 'Бурунді',
+  '116': 'Камбоджа', '120': 'Камерун', '124': 'Канада', '140': 'ЦАР',
+  '144': 'Шрі-Ланка', '152': 'Чилі', '156': 'Китай', '170': 'Колумбія',
+  '178': 'Конго', '180': 'ДР Конго', '188': 'Коста-Ріка', '191': 'Хорватія',
+  '192': 'Куба', '196': 'Кіпр', '203': 'Чехія', '204': 'Бенін',
+  '208': 'Данія', '214': 'Домініканська Республіка', '218': 'Еквадор',
+  '222': 'Сальвадор', '231': 'Ефіопія', '232': 'Еритрея', '233': 'Естонія',
+  '246': 'Фінляндія', '250': 'Франція', '266': 'Габон', '268': 'Грузія',
+  '276': 'Німеччина', '288': 'Гана', '300': 'Греція', '320': 'Гватемала',
+  '324': 'Гвінея', '328': 'Гаяна', '332': 'Гаїті', '340': 'Гондурас',
+  '348': 'Угорщина', '356': 'Індія', '360': 'Індонезія', '364': 'Іран',
+  '368': 'Ірак', '372': 'Ірландія', '376': 'Ізраїль', '380': 'Італія',
+  '384': "Кот-д'Івуар", '398': 'Казахстан', '400': 'Йорданія', '404': 'Кенія',
+  '408': 'Північна Корея', '410': 'Південна Корея', '414': 'Кувейт',
+  '417': 'Киргизстан', '418': 'Лаос', '422': 'Ліван', '428': 'Латвія',
+  '430': 'Ліберія', '434': 'Лівія', '440': 'Литва', '442': 'Люксембург',
+  '450': 'Мадагаскар', '454': 'Малаві', '458': 'Малайзія', '466': 'Малі',
+  '478': 'Мавританія', '484': 'Мексика', '496': 'Монголія', '498': 'Молдова',
+  '504': 'Марокко', '508': 'Мозамбік', '516': 'Намібія', '524': 'Непал',
+  '528': 'Нідерланди', '554': 'Нова Зеландія', '558': 'Нікарагуа',
+  '562': 'Нігер', '566': 'Нігерія', '578': 'Норвегія', '586': 'Пакистан',
+  '591': 'Панама', '598': 'Папуа Нова Гвінея', '600': 'Парагвай',
+  '604': 'Перу', '608': 'Філіппіни', '616': 'Польща', '634': 'Катар',
+  '642': 'Румунія', '643': 'Росія', '646': 'Руанда', '682': 'Саудівська Аравія',
+  '686': 'Сенегал', '688': 'Сербія', '703': 'Словаччина', '705': 'Словенія',
+  '706': 'Сомалі', '710': 'Південна Африка', '716': 'Зімбабве',
+  '724': 'Іспанія', '728': 'Південний Судан', '729': 'Судан',
+  '740': 'Суринам', '748': 'Есватіні', '752': 'Швеція', '756': 'Швейцарія',
+  '760': 'Сирія', '762': 'Таджикистан', '764': 'Таїланд', '768': 'Того',
+  '780': 'Тринідад і Тобаго', '788': 'Туніс', '792': 'Туреччина',
+  '800': 'Уганда', '818': 'Єгипет', '834': 'Танзанія', '854': 'Буркіна-Фасо',
+  '858': 'Уругвай', '860': 'Узбекистан', '862': 'Венесуела',
+  '887': 'Ємен', '894': 'Замбія', '704': "В'єтнам",
+}
+
+type Tooltip = { x: number; y: number; id: string } | null
 
 export default function HomePage() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [activeNation, setActiveNation] = useState<string | null>(null)
+  const [tooltip, setTooltip] = useState<Tooltip>(null)
 
   useEffect(() => {
     let animId: number
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const W = () => canvas.parentElement?.clientWidth || window.innerWidth - 220
-    const H = () => canvas.parentElement?.clientHeight || window.innerHeight
+    const W = () => window.innerWidth
+    const H = () => window.innerHeight
+
+    const cleanups: (() => void)[] = []
 
     async function init() {
       const THREE = await import('three')
@@ -22,139 +68,211 @@ export default function HomePage() {
       const renderer = new THREE.WebGLRenderer({ canvas: canvas as HTMLCanvasElement, antialias: true })
       renderer.setSize(W(), H())
       renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
-      renderer.setClearColor(0x04080f)
+      renderer.setClearColor(0x00000a)
+      renderer.shadowMap.enabled = false
 
       const scene = new THREE.Scene()
       const camera = new THREE.PerspectiveCamera(42, W() / H(), 0.1, 100)
-      camera.position.z = 2.5
+      camera.position.z = 2.2
 
-      // Зірки
-      const starPos = new Float32Array(3000)
-      for (let i = 0; i < 3000; i++) starPos[i] = (Math.random() - 0.5) * 80
-      const starGeo = new THREE.BufferGeometry()
-      starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3))
-      scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.06, transparent: true, opacity: 0.6 })))
+      // ── ЗІРКИ (5000, три розмірні рівні) ──────────────────────────────────
+      ;[
+        { count: 2500, size: 0.04, opacity: 0.8  },
+        { count: 1800, size: 0.08, opacity: 0.55 },
+        { count: 700,  size: 0.15, opacity: 0.35 },
+      ].forEach(({ count, size, opacity }) => {
+        const pos = new Float32Array(count * 3)
+        for (let i = 0; i < count * 3; i++) pos[i] = (Math.random() - 0.5) * 120
+        const geo = new THREE.BufferGeometry()
+        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+        scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
+          color: 0xffffff, size, transparent: true, opacity, sizeAttenuation: true,
+        })))
+      })
 
-      // Глобус
+      // ── ТУМАННІСТЬ (кольорові хмари зірок) ───────────────────────────────
+      ;[
+        { color: 0x1a3a8f, count: 180, spread: 45, ox: 28,  oy: 14,  oz: -65 },
+        { color: 0x8f1a3a, count: 120, spread: 32, ox: -32, oy: -10, oz: -75 },
+        { color: 0x1a5f8f, count: 150, spread: 38, ox: 10,  oy: -20, oz: -58 },
+        { color: 0x3a1a8f, count: 90,  spread: 28, ox: -18, oy: 22,  oz: -80 },
+      ].forEach(({ color, count, spread, ox, oy, oz }) => {
+        const pos = new Float32Array(count * 3)
+        for (let i = 0; i < count; i++) {
+          pos[i * 3]     = ox + (Math.random() - 0.5) * spread
+          pos[i * 3 + 1] = oy + (Math.random() - 0.5) * spread
+          pos[i * 3 + 2] = oz + (Math.random() - 0.5) * spread
+        }
+        const geo = new THREE.BufferGeometry()
+        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+        scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
+          color, size: 0.3, transparent: true, opacity: 0.18, sizeAttenuation: true,
+        })))
+      })
+
+      // ── ОСВІТЛЕННЯ ────────────────────────────────────────────────────────
+      scene.add(new THREE.AmbientLight(0x111133, 0.3))
+      const sun = new THREE.DirectionalLight(0xffffff, 3.0)
+      sun.position.set(5, 3, 5)
+      scene.add(sun)
+
+      // ── ГЛОБУС ────────────────────────────────────────────────────────────
       const group = new THREE.Group()
       scene.add(group)
 
-      const globeMesh = new THREE.Mesh(
-        new THREE.SphereGeometry(1, 64, 64),
-        new THREE.MeshPhongMaterial({ color: 0x0a1628, shininess: 20 })
-      )
+      const globeGeo = new THREE.SphereGeometry(1, 64, 64)
+      const globeMat = new THREE.MeshPhongMaterial({
+        color: 0x0a1628,
+        shininess: 10,
+      })
+      const globeMesh = new THREE.Mesh(globeGeo, globeMat)
       group.add(globeMesh)
 
-      scene.add(new THREE.Mesh(
-        new THREE.SphereGeometry(1.06, 32, 32),
-        new THREE.MeshPhongMaterial({ color: 0x1155ff, transparent: true, opacity: 0.05, side: THREE.BackSide })
+      // Атмосфера (синій ореол)
+      group.add(new THREE.Mesh(
+        new THREE.SphereGeometry(1.15, 32, 32),
+        new THREE.MeshPhongMaterial({
+          color: 0x2255cc,
+          transparent: true,
+          opacity: 0.1,
+          side: THREE.BackSide,
+          depthWrite: false,
+        })
       ))
 
-      scene.add(new THREE.AmbientLight(0x223366, 1.5))
-      const sun = new THREE.DirectionalLight(0x99bbff, 2.5)
-      sun.position.set(4, 2, 5)
-      scene.add(sun)
+      // Внутрішній ореол (прилеглий до глобусу)
+      group.add(new THREE.Mesh(
+        new THREE.SphereGeometry(1.03, 32, 32),
+        new THREE.MeshPhongMaterial({
+          color: 0x1144ee,
+          transparent: true,
+          opacity: 0.04,
+          side: THREE.BackSide,
+          depthWrite: false,
+        })
+      ))
 
-      // Кордони
+      // ── ТЕКСТУРИ (асинхронно) ─────────────────────────────────────────────
+      const loader = new THREE.TextureLoader()
+      const BASE = 'https://unpkg.com/three-globe/example/img/'
+      let cloudMesh: THREE.Mesh | null = null
+
+      Promise.all([
+        loader.loadAsync(BASE + 'earth-blue-marble.jpg'),
+        loader.loadAsync(BASE + 'earth-topology.png'),
+        loader.loadAsync(BASE + 'earth-clouds.png'),
+      ]).then(([dayTex, bumpTex, cloudTex]) => {
+        const mat = globeMesh.material as THREE.MeshPhongMaterial
+        mat.map      = dayTex
+        mat.bumpMap  = bumpTex
+        mat.bumpScale = 0.05
+        mat.specular  = new THREE.Color(0x222233)
+        mat.shininess = 12
+        mat.color.set(0xffffff)
+        mat.needsUpdate = true
+
+        cloudMesh = new THREE.Mesh(
+          new THREE.SphereGeometry(1.006, 64, 64),
+          new THREE.MeshPhongMaterial({
+            map: cloudTex,
+            transparent: true,
+            opacity: 0.28,
+            depthWrite: false,
+          })
+        )
+        group.add(cloudMesh)
+      }).catch(() => { /* fall back to colour globe */ })
+
+      // ── МІСЯЦЬ ────────────────────────────────────────────────────────────
+      const moonOrbit = new THREE.Group()
+      scene.add(moonOrbit)
+      const moonMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.07, 24, 24),
+        new THREE.MeshPhongMaterial({ color: 0x999999, shininess: 3 })
+      )
+      moonMesh.position.set(2.0, 0.18, 0)
+      moonOrbit.add(moonMesh)
+
+      // Маленький shine на місяці
+      const moonLight = new THREE.PointLight(0xaaaacc, 0.15, 3)
+      moonLight.position.set(2.0, 0.18, 0)
+      moonOrbit.add(moonLight)
+
+      // ── КОРДОНИ ───────────────────────────────────────────────────────────
+      const NATION_COLORS: Record<string, string> = {}
+      Object.entries(NATIONS_DATA).forEach(([id, n]) => { NATION_COLORS[id] = n.color })
+
       let allFeatures: any[] = []
-      try {
-        const resp = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
-        const world = await resp.json()
-        const countries = topojson.feature(world, world.objects.countries)
-        allFeatures = (countries as any).features
+      const countryBorders = new Map<string, THREE.LineSegments>()
 
-        const NATIONS: Record<string, string> = {
-          '620': '#c8a84b',
-          '826': '#85b7eb',
-          '76': '#5DCAA5',
-          '840': '#ED937B',
-        }
-
-        const normalPos: number[] = []
-        const nationLines: Record<string, number[]> = {}
-        Object.keys(NATIONS).forEach(k => nationLines[k] = [])
-        const ukrainePos: number[] = []
-
-        function addRing(ring: number[][], target: number[]) {
-          for (let i = 0; i < ring.length - 1; i++) {
-            const pt = (lon: number, lat: number) => {
-              const phi = (90 - lat) * Math.PI / 180
-              const theta = (lon + 180) * Math.PI / 180
-              target.push(
-                -Math.sin(phi) * Math.cos(theta),
-                Math.cos(phi),
-                Math.sin(phi) * Math.sin(theta)
-              )
-            }
-            pt(ring[i][0], ring[i][1])
-            pt(ring[i + 1][0], ring[i + 1][1])
+      function addRing(ring: number[][], target: number[]) {
+        for (let i = 0; i < ring.length - 1; i++) {
+          const latLonToXyz = (lon: number, lat: number) => {
+            const phi   = (90 - lat) * Math.PI / 180
+            const theta = (lon + 180) * Math.PI / 180
+            target.push(
+              -Math.sin(phi) * Math.cos(theta),
+               Math.cos(phi),
+               Math.sin(phi) * Math.sin(theta)
+            )
           }
+          latLonToXyz(ring[i][0], ring[i][1])
+          latLonToXyz(ring[i + 1][0], ring[i + 1][1])
         }
-
-        // Всі інші країни
-        allFeatures.forEach((f: any) => {
-          const id = String(f.id)
-          if (id === '804') return // Україну малюємо окремо
-          const geo = f.geometry
-          const target = NATIONS[id] ? nationLines[id] : normalPos
-          const rings = geo.type === 'Polygon' ? geo.coordinates : geo.coordinates.flatMap((p: any) => p)
-          rings.forEach((ring: number[][]) => addRing(ring, target))
-        })
-
-        // Україна з world-atlas (основна частина)
-        allFeatures.forEach((f: any) => {
-          if (String(f.id) !== '804') return
-          const geo = f.geometry
-          const rings = geo.type === 'Polygon' ? geo.coordinates : geo.coordinates.flatMap((p: any) => p)
-          rings.forEach((ring: number[][]) => addRing(ring, ukrainePos))
-        })
-
-        // Крим — вручну вписані координати
-        const crimea: number[][] = [
-          [33.62, 46.17], [34.10, 46.10], [34.60, 46.05], [35.02, 45.73],
-          [35.38, 45.45], [35.55, 45.31], [36.09, 45.04], [36.47, 45.05],
-          [36.63, 45.35], [36.20, 45.45], [35.76, 44.82], [35.22, 44.65],
-          [35.02, 44.60], [34.42, 44.55], [34.10, 44.40], [33.57, 44.41],
-          [33.00, 44.50], [32.49, 44.67], [32.00, 44.90], [31.49, 45.08],
-          [31.61, 45.50], [32.00, 45.70], [32.18, 45.79], [32.84, 46.18],
-          [33.30, 46.20], [33.62, 46.17],
-        ]
-        addRing(crimea, ukrainePos)
-
-        // Рендеримо Україну з Кримом
-        if (ukrainePos.length) {
-          const g = new THREE.BufferGeometry()
-          g.setAttribute('position', new THREE.Float32BufferAttribute(ukrainePos, 3))
-          group.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: new THREE.Color('#ffd700') })))
-        }
-
-        // Звичайні кордони
-        if (normalPos.length) {
-          const g = new THREE.BufferGeometry()
-          g.setAttribute('position', new THREE.Float32BufferAttribute(normalPos, 3))
-          group.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x0d2a50, transparent: true, opacity: 0.7 })))
-        }
-
-        // Підсвічені нації
-        Object.entries(nationLines).forEach(([id, pos]) => {
-          if (!pos.length) return
-          const g = new THREE.BufferGeometry()
-          g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
-          group.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: new THREE.Color(NATIONS[id]) })))
-        })
-      } catch (e) {
-        console.error('Map error:', e)
       }
 
-      // Raycaster
-      const raycaster = new THREE.Raycaster()
-      const mouse = new THREE.Vector2()
+      const crimea: number[][] = [
+        [33.62, 46.17], [34.10, 46.10], [34.60, 46.05], [35.02, 45.73],
+        [35.38, 45.45], [35.55, 45.31], [36.09, 45.04], [36.47, 45.05],
+        [36.63, 45.35], [36.20, 45.45], [35.76, 44.82], [35.22, 44.65],
+        [35.02, 44.60], [34.42, 44.55], [34.10, 44.40], [33.57, 44.41],
+        [33.00, 44.50], [32.49, 44.67], [32.00, 44.90], [31.49, 45.08],
+        [31.61, 45.50], [32.00, 45.70], [32.18, 45.79], [32.84, 46.18],
+        [33.30, 46.20], [33.62, 46.17],
+      ]
 
-      function getLatLon(e: MouseEvent) {
+      fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
+        .then(r => r.json())
+        .then(world => {
+          const countries = topojson.feature(world, world.objects.countries)
+          allFeatures = (countries as any).features
+
+          for (const f of allFeatures) {
+            const id  = String(f.id)
+            const pos: number[] = []
+            const geo  = f.geometry
+            const rings = geo.type === 'Polygon'
+              ? geo.coordinates
+              : geo.coordinates.flatMap((p: any) => p)
+            rings.forEach((ring: number[][]) => addRing(ring, pos))
+            if (id === '804') addRing(crimea, pos)
+            if (!pos.length) continue
+
+            const color = NATION_COLORS[id]
+              ? new THREE.Color(NATION_COLORS[id])
+              : new THREE.Color(0xffffff)
+            const bufGeo = new THREE.BufferGeometry()
+            bufGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+            const mat  = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0 })
+            const lines = new THREE.LineSegments(bufGeo, mat)
+            lines.visible = false
+            lines.renderOrder = 1
+            group.add(lines)
+            countryBorders.set(id, lines)
+          }
+        })
+        .catch(e => console.error('Map error:', e))
+
+      // ── RAYCASTER ─────────────────────────────────────────────────────────
+      const raycaster = new THREE.Raycaster()
+      const mouse     = new THREE.Vector2()
+      let hoveredId: string | null = null
+
+      function getLatLon(clientX: number, clientY: number) {
         const rect = (canvas as HTMLCanvasElement).getBoundingClientRect()
         mouse.set(
-          ((e.clientX - rect.left) / rect.width) * 2 - 1,
-          -((e.clientY - rect.top) / rect.height) * 2 + 1
+          ((clientX - rect.left) / rect.width) * 2 - 1,
+          -((clientY - rect.top)  / rect.height) * 2 + 1
         )
         raycaster.setFromCamera(mouse, camera)
         const hits = raycaster.intersectObject(globeMesh)
@@ -163,22 +281,22 @@ export default function HomePage() {
         const lat = 90 - Math.acos(Math.max(-1, Math.min(1, point.y))) * 180 / Math.PI
         let theta = Math.atan2(point.z, -point.x)
         if (theta < 0) theta += 2 * Math.PI
-        const lon = theta * 180 / Math.PI - 180
-        return { lat, lon }
+        return { lat, lon: theta * 180 / Math.PI - 180 }
       }
 
       function findNation(lat: number, lon: number): string | null {
         for (const f of allFeatures) {
-          const geo = f.geometry
-          const rings = geo.type === 'Polygon' ? geo.coordinates : geo.coordinates.flatMap((p: any) => p)
+          const geo   = f.geometry
+          const rings = geo.type === 'Polygon'
+            ? geo.coordinates
+            : geo.coordinates.flatMap((p: any) => p)
           const inside = rings.some((ring: number[][]) => {
             let inPoly = false
             for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
               const xi = ring[i][0], yi = ring[i][1]
               const xj = ring[j][0], yj = ring[j][1]
-              if ((yi > lat) !== (yj > lat) && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) {
+              if ((yi > lat) !== (yj > lat) && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi)
                 inPoly = !inPoly
-              }
             }
             return inPoly
           })
@@ -187,66 +305,107 @@ export default function HomePage() {
         return null
       }
 
-      // Керування
+      function showBorder(id: string | null) {
+        if (hoveredId === id) return
+        if (hoveredId) {
+          const prev = countryBorders.get(hoveredId)
+          if (prev) { (prev.material as THREE.LineBasicMaterial).opacity = 0; prev.visible = false }
+        }
+        hoveredId = id
+        if (id) {
+          const lines = countryBorders.get(id)
+          if (lines) { lines.visible = true; (lines.material as THREE.LineBasicMaterial).opacity = 0.85 }
+        }
+      }
+
+      // ── УПРАВЛІННЯ (drag / zoom / touch) ──────────────────────────────────
       let isDrag = false, didDrag = false, px = 0, py = 0
       let rotX = 0.1, rotY = Math.PI / 2
       let autoRotate = true
       let autoTimer: ReturnType<typeof setTimeout>
 
-      canvas.addEventListener('mousedown', e => {
+      const onMouseDown = (e: MouseEvent) => {
         isDrag = true; didDrag = false
         px = e.clientX; py = e.clientY
         autoRotate = false; clearTimeout(autoTimer)
-        canvas.style.cursor = 'grabbing'
-      })
+        canvas!.style.cursor = 'grabbing'
+      }
+      canvas!.addEventListener('mousedown', onMouseDown)
+      cleanups.push(() => canvas!.removeEventListener('mousedown', onMouseDown))
 
-      window.addEventListener('mousemove', e => {
-        if (!isDrag) return
-        const dx = e.clientX - px, dy = e.clientY - py
-        if (Math.abs(dx) > 2 || Math.abs(dy) > 2) didDrag = true
-        rotY += dx * 0.004
-        rotX += dy * 0.004
-        rotX = Math.max(-1.3, Math.min(1.3, rotX))
-        group.rotation.set(rotX, rotY, 0)
-        px = e.clientX; py = e.clientY
-      })
+      const onMouseMove = (e: MouseEvent) => {
+        if (isDrag) {
+          const dx = e.clientX - px, dy = e.clientY - py
+          if (Math.abs(dx) > 2 || Math.abs(dy) > 2) didDrag = true
+          rotY += dx * 0.004; rotX += dy * 0.004
+          rotX = Math.max(-1.3, Math.min(1.3, rotX))
+          group.rotation.set(rotX, rotY, 0)
+          px = e.clientX; py = e.clientY
+          return
+        }
+        const coords = getLatLon(e.clientX, e.clientY)
+        if (!coords) {
+          showBorder(null); setTooltip(null)
+          canvas!.style.cursor = 'grab'; return
+        }
+        const id = findNation(coords.lat, coords.lon)
+        showBorder(id)
+        if (id) {
+          setTooltip({ x: e.clientX, y: e.clientY, id })
+          canvas!.style.cursor = NATIONS_DATA[id] ? 'pointer' : 'default'
+        } else {
+          setTooltip(null); canvas!.style.cursor = 'grab'
+        }
+      }
+      window.addEventListener('mousemove', onMouseMove)
+      cleanups.push(() => window.removeEventListener('mousemove', onMouseMove))
 
-      window.addEventListener('mouseup', () => {
+      const onMouseUp = () => {
         isDrag = false
-        canvas.style.cursor = 'grab'
-        autoTimer = setTimeout(() => autoRotate = true, 3000)
-      })
+        canvas!.style.cursor = 'grab'
+        autoTimer = setTimeout(() => { autoRotate = true }, 3000)
+      }
+      window.addEventListener('mouseup', onMouseUp)
+      cleanups.push(() => window.removeEventListener('mouseup', onMouseUp))
 
-      canvas.addEventListener('click', e => {
+      const onMouseLeave = () => { showBorder(null); setTooltip(null) }
+      canvas!.addEventListener('mouseleave', onMouseLeave)
+      cleanups.push(() => canvas!.removeEventListener('mouseleave', onMouseLeave))
+
+      const onClick = (e: MouseEvent) => {
         if (didDrag) return
-        const coords = getLatLon(e)
+        const coords = getLatLon(e.clientX, e.clientY)
         if (!coords) return
         const id = findNation(coords.lat, coords.lon)
         if (id) setActiveNation(id)
-      })
+      }
+      canvas!.addEventListener('click', onClick)
+      cleanups.push(() => canvas!.removeEventListener('click', onClick))
 
-      canvas.addEventListener('wheel', e => {
-        camera.position.z = Math.max(1.5, Math.min(5, camera.position.z + e.deltaY * 0.003))
+      const onWheel = (e: WheelEvent) => {
+        camera.position.z = Math.max(1.4, Math.min(4.0, camera.position.z + e.deltaY * 0.003))
         e.preventDefault()
-      }, { passive: false })
+      }
+      canvas!.addEventListener('wheel', onWheel, { passive: false })
+      cleanups.push(() => canvas!.removeEventListener('wheel', onWheel))
 
       // Touch
       let lx = 0, ly = 0
-      canvas.addEventListener('touchstart', e => {
-        lx = e.touches[0].clientX; ly = e.touches[0].clientY
-        autoRotate = false
-      }, { passive: true })
-      canvas.addEventListener('touchmove', e => {
+      const onTouchStart = (e: TouchEvent) => {
+        lx = e.touches[0].clientX; ly = e.touches[0].clientY; autoRotate = false
+      }
+      const onTouchMove = (e: TouchEvent) => {
         rotY += (e.touches[0].clientX - lx) * 0.004
         rotX += (e.touches[0].clientY - ly) * 0.004
         rotX = Math.max(-1.3, Math.min(1.3, rotX))
         group.rotation.set(rotX, rotY, 0)
         lx = e.touches[0].clientX; ly = e.touches[0].clientY
         e.preventDefault()
-      }, { passive: false })
-      canvas.addEventListener('touchend', () => {
-        autoTimer = setTimeout(() => autoRotate = true, 3000)
-      }, { passive: true })
+      }
+      const onTouchEnd = () => { autoTimer = setTimeout(() => { autoRotate = true }, 3000) }
+      canvas!.addEventListener('touchstart', onTouchStart, { passive: true })
+      canvas!.addEventListener('touchmove',  onTouchMove,  { passive: false })
+      canvas!.addEventListener('touchend',   onTouchEnd,   { passive: true })
 
       // Resize
       const onResize = () => {
@@ -255,54 +414,94 @@ export default function HomePage() {
         camera.updateProjectionMatrix()
       }
       window.addEventListener('resize', onResize)
+      cleanups.push(() => window.removeEventListener('resize', onResize))
 
-      // Анімація
+      // ── АНІМАЦІЯ ──────────────────────────────────────────────────────────
       group.rotation.set(rotX, rotY, 0)
+      let moonAngle = 0
+
       const animate = () => {
         animId = requestAnimationFrame(animate)
         if (autoRotate && !isDrag) {
-          rotY += 0.0008
+          rotY += 0.0005
           group.rotation.set(rotX, rotY, 0)
         }
+        if (cloudMesh) cloudMesh.rotation.y += 0.00015
+        moonAngle += 0.001
+        moonOrbit.rotation.y = moonAngle
+        moonOrbit.rotation.x = Math.sin(moonAngle * 0.4) * 0.12
         renderer.render(scene, camera)
       }
       animate()
     }
 
     init()
-    return () => cancelAnimationFrame(animId)
+    return () => {
+      cancelAnimationFrame(animId)
+      cleanups.forEach(fn => fn())
+    }
   }, [])
 
-  const nation = activeNation ? NATIONS_DATA[activeNation] : null
+  const nation       = activeNation ? NATIONS_DATA[activeNation] : null
+  const tooltipNation = tooltip ? NATIONS_DATA[tooltip.id] : null
+  const tooltipName   = tooltip
+    ? (tooltipNation?.name || COUNTRY_NAMES[tooltip.id] || null)
+    : null
 
   return (
     <>
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        bottom: 0,
-        left: 0,
-        right: 0,
-      }}>
+      {/* ── CANVAS ── */}
+      <div style={{ position: 'fixed', inset: 0 }}>
         <canvas
           ref={canvasRef}
           style={{ width: '100%', height: '100%', display: 'block', cursor: 'grab' }}
         />
       </div>
 
-      {/* Панель нації */}
+      {/* ── TOOLTIP ── */}
+      {tooltip && tooltipName && (
+        <div
+          style={{
+            position: 'fixed',
+            left: tooltip.x + 18,
+            top:  tooltip.y - 56,
+            pointerEvents: 'none',
+            zIndex: 20,
+            background: 'rgba(4,8,15,0.92)',
+            border: `1px solid ${tooltipNation ? tooltipNation.color + '45' : 'rgba(255,255,255,0.1)'}`,
+            borderRadius: '8px',
+            padding: '8px 14px',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            boxShadow: tooltipNation
+              ? `0 0 16px ${tooltipNation.color}22`
+              : '0 4px 16px rgba(0,0,0,0.5)',
+            transition: 'opacity 0.1s',
+          }}
+        >
+          <div style={{ color: 'white', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap' }}>
+            {tooltipName}
+          </div>
+          {tooltipNation && (
+            <div style={{
+              color: tooltipNation.color,
+              fontSize: '11px', fontStyle: 'italic', marginTop: '2px', whiteSpace: 'nowrap',
+            }}>
+              {tooltipNation.soul}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── ПАНЕЛЬ НАЦІЇ ── */}
       <div style={{
-        position: 'fixed',
-        top: 0,
-        right: 0,
-        bottom: 0,
+        position: 'fixed', top: 0, right: 0, bottom: 0,
         width: 'min(360px, 100vw)',
         background: 'rgba(4,8,15,0.97)',
         borderLeft: '1px solid rgba(255,255,255,0.08)',
         transform: nation ? 'translateX(0)' : 'translateX(100%)',
         transition: 'transform 0.35s cubic-bezier(0.4,0,0.2,1)',
-        zIndex: 30,
-        overflowY: 'auto',
+        zIndex: 30, overflowY: 'auto',
         padding: '40px 28px 100px',
       }}>
         <button
@@ -317,7 +516,7 @@ export default function HomePage() {
           }}
         >×</button>
 
-        {nation && (
+        {nation && activeNation && (
           <>
             <div style={{
               width: '56px', height: '56px', borderRadius: '50%',
@@ -326,10 +525,11 @@ export default function HomePage() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               marginBottom: '16px',
               fontSize: '11px', letterSpacing: '0.1em',
-              color: nation.color, fontWeight: 500,
+              color: nation.color, fontWeight: 600,
             }}>
               {nation.flag}
             </div>
+
             <h1 style={{ color: 'white', fontSize: '1.6rem', fontWeight: 400, marginBottom: '6px' }}>
               {nation.name}
             </h1>
@@ -338,11 +538,28 @@ export default function HomePage() {
             </div>
             <div style={{
               color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem',
-              marginBottom: '32px', paddingBottom: '24px',
+              marginBottom: '20px', paddingBottom: '20px',
               borderBottom: '1px solid rgba(255,255,255,0.08)',
             }}>
               {nation.soulDesc}
             </div>
+
+            {/* Link to full nation page */}
+            <Link href={`/nation/${activeNation}`} style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+              padding: '11px 16px', marginBottom: '24px',
+              border: `1px solid ${nation.color}40`,
+              borderRadius: '8px',
+              background: nation.color + '12',
+              color: nation.color, fontSize: '13px', fontWeight: 600,
+              letterSpacing: '0.04em', textDecoration: 'none',
+            }}>
+              Відкрити повний архетип
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m9 18 6-6-6-6"/>
+              </svg>
+            </Link>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {nation.matrix.map((m) => (
                 <div key={m.key} style={{
@@ -368,4 +585,4 @@ export default function HomePage() {
       </div>
     </>
   )
-  }
+}
