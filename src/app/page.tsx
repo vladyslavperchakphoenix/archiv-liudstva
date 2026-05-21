@@ -79,7 +79,7 @@ export default function HomePage() {
       const THREE = await import('three')
       const topojson = await import('topojson-client')
 
-      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
+      const renderer = new THREE.WebGLRenderer({ canvas: canvas as HTMLCanvasElement, antialias: true })
       renderer.setSize(W(), H())
       renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
       renderer.setClearColor(0x04080f)
