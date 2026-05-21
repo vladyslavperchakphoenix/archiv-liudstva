@@ -76,7 +76,7 @@ export default function HomePage() {
       const renderer = new THREE.WebGLRenderer({ canvas: canvas as HTMLCanvasElement, antialias: true })
       renderer.setSize(W(), H())
       renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
-      renderer.setClearColor(0x00000a)
+      renderer.setClearColor(0x000005)
       renderer.shadowMap.enabled = false
 
       const scene = new THREE.Scene()
@@ -84,28 +84,28 @@ export default function HomePage() {
       const mobile = window.innerWidth < 768
       camera.position.z = mobile ? 3.2 : 2.2
 
-      // ── ЗІРКИ — sizeAttenuation:false → розмір у пікселях ──────────────
+      // ── ЗІРКИ (6000) — різні розміри у пікселях ─────────────────────────
       ;[
-        { count: 2500, size: 1.0, opacity: 0.9  },
-        { count: 1500, size: 1.6, opacity: 0.65 },
-        { count: 500,  size: 2.4, opacity: 0.4  },
+        { count: 3500, size: 1.0, opacity: 0.75 },
+        { count: 1500, size: 1.5, opacity: 0.55 },
+        { count: 700,  size: 2.0, opacity: 0.40 },
+        { count: 270,  size: 2.8, opacity: 0.28 },
+        { count: 30,   size: 4.0, opacity: 0.90 },
       ].forEach(({ count, size, opacity }) => {
         const pos = new Float32Array(count * 3)
-        for (let i = 0; i < count * 3; i++) pos[i] = (Math.random() - 0.5) * 80
+        for (let i = 0; i < count * 3; i++) pos[i] = (Math.random() - 0.5) * 120
         const geo = new THREE.BufferGeometry()
         geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
         scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
-          color: 0xffffff, size, transparent: true, opacity,
-          sizeAttenuation: false,  // розмір у пікселях, незалежно від відстані
+          color: 0xffffff, size, transparent: true, opacity, sizeAttenuation: false,
         })))
       })
 
-      // ── ТУМАННІСТЬ — теж у пікселях ──────────────────────────────────────
+      // ── ТУМАННІСТЬ ────────────────────────────────────────────────────────
       ;[
-        { color: 0x3a6abf, count: 200, spread: 40, ox: 28,  oy: 14,  oz: -60 },
-        { color: 0xbf3a5a, count: 140, spread: 30, ox: -30, oy: -8,  oz: -70 },
-        { color: 0x3a9fbf, count: 160, spread: 35, ox: 10,  oy: -18, oz: -55 },
-        { color: 0x6a3abf, count: 100, spread: 25, ox: -16, oy: 20,  oz: -75 },
+        { color: 0x2255aa, count: 180, spread: 40, ox: 28,  oy: 14,  oz: -60 },
+        { color: 0x8822aa, count: 120, spread: 30, ox: -30, oy: -8,  oz: -70 },
+        { color: 0x1188aa, count: 140, spread: 35, ox: 10,  oy: -18, oz: -55 },
       ].forEach(({ color, count, spread, ox, oy, oz }) => {
         const pos = new Float32Array(count * 3)
         for (let i = 0; i < count; i++) {
@@ -116,78 +116,34 @@ export default function HomePage() {
         const geo = new THREE.BufferGeometry()
         geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
         scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
-          color, size: 1.8, transparent: true, opacity: 0.35, sizeAttenuation: false,
+          color, size: 1.6, transparent: true, opacity: 0.25, sizeAttenuation: false,
         })))
       })
 
-      // ── ОСВІТЛЕННЯ ────────────────────────────────────────────────────────
-      scene.add(new THREE.AmbientLight(0x111133, 0.3))
-      const sun = new THREE.DirectionalLight(0xffffff, 3.0)
-      sun.position.set(5, 3, 5)
-      scene.add(sun)
+      // ── ОСВІТЛЕННЯ (NASA-стиль) ───────────────────────────────────────────
+      scene.add(new THREE.AmbientLight(0x111133, 0.4))
+      const sunLight = new THREE.DirectionalLight(0xfff5e0, 2.8)
+      sunLight.position.set(5, 2, 4)
+      scene.add(sunLight)
+      scene.add(new THREE.HemisphereLight(0x0033aa, 0x000000, 0.3))
 
       // ── ГЛОБУС ────────────────────────────────────────────────────────────
       const group = new THREE.Group()
       scene.add(group)
 
       const globeGeo = new THREE.SphereGeometry(1, 64, 64)
-      const globeMat = new THREE.MeshPhongMaterial({
-        color: 0x1a3a6e,   // видимий синій поки текстури грузяться
-        shininess: 10,
+      const globeMat = new THREE.MeshStandardMaterial({
+        color: 0x1a3a6e,
+        roughness: 0.7,
+        metalness: 0.0,
       })
       const globeMesh = new THREE.Mesh(globeGeo, globeMat)
       group.add(globeMesh)
 
-      // Атмосфера (синій ореол)
+      // Fresnel атмосфера — синє світіння по краях
       group.add(new THREE.Mesh(
-        new THREE.SphereGeometry(1.15, 32, 32),
-        new THREE.MeshPhongMaterial({
-          color: 0x2255cc,
-          transparent: true,
-          opacity: 0.1,
-          side: THREE.BackSide,
-          depthWrite: false,
-        })
-      ))
-
-      // Внутрішній ореол (прилеглий до глобусу)
-      group.add(new THREE.Mesh(
-        new THREE.SphereGeometry(1.03, 32, 32),
-        new THREE.MeshPhongMaterial({
-          color: 0x1144ee,
-          transparent: true,
-          opacity: 0.04,
-          side: THREE.BackSide,
-          depthWrite: false,
-        })
-      ))
-
-      // ── ТЕКСТУРИ (каскад URL → Fresnel fallback) ──────────────────────────
-      const loader = new THREE.TextureLoader()
-
-      const earthUrls = [
-        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/planets/earth_atmos_2048.jpg',
-        'https://raw.githubusercontent.com/turban/webgl-earth/master/images/2_no_clouds_4k.jpg',
-        'https://cdn.jsdelivr.net/npm/three-globe@2.31.0/example/img/earth-blue-marble.jpg',
-      ]
-
-      let textureLoaded = false
-      let textureTimeoutId: ReturnType<typeof setTimeout>
-
-      const applyTexture = (tex: THREE.Texture) => {
-        textureLoaded = true
-        clearTimeout(textureTimeoutId)
-        const mat = globeMesh.material as THREE.MeshPhongMaterial
-        mat.map = tex
-        mat.specular = new THREE.Color(0x222233)
-        mat.shininess = 12
-        mat.color.set(0xffffff)
-        mat.needsUpdate = true
-      }
-
-      const applyFresnel = () => {
-        if (textureLoaded) return
-        globeMesh.material = new THREE.ShaderMaterial({
+        new THREE.SphereGeometry(1.08, 32, 32),
+        new THREE.ShaderMaterial({
           vertexShader: `
             varying vec3 vNormal;
             void main() {
@@ -198,23 +154,96 @@ export default function HomePage() {
           fragmentShader: `
             varying vec3 vNormal;
             void main() {
-              float rim = pow(0.75 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.5);
-              vec3 deep  = vec3(0.04, 0.09, 0.16);
-              vec3 glow  = vec3(0.15, 0.45, 1.0);
-              gl_FragColor = vec4(mix(deep, glow, rim), 1.0);
+              float intensity = pow(0.7 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
+              gl_FragColor = vec4(0.1, 0.4, 1.0, 1.0) * intensity;
             }
           `,
+          blending: THREE.AdditiveBlending,
+          side: THREE.BackSide,
+          transparent: true,
+          depthWrite: false,
         })
+      ))
+
+      // ── ТЕКСТУРИ (NASA r128, каскад URL) ─────────────────────────────────
+      const loader = new THREE.TextureLoader()
+
+      const earthUrls = [
+        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_atmos_2048.jpg',
+        'https://raw.githubusercontent.com/turban/webgl-earth/master/images/2_no_clouds_4k.jpg',
+        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/planets/earth_atmos_2048.jpg',
+      ]
+
+      let textureLoaded = false
+      let textureTimeoutId: ReturnType<typeof setTimeout>
+      let cloudMesh: THREE.Mesh | null = null
+
+      const applyTexture = (tex: THREE.Texture) => {
+        textureLoaded = true
+        clearTimeout(textureTimeoutId)
+        const mat = globeMesh.material as THREE.MeshStandardMaterial
+        mat.map = tex
+        mat.color.set(0xffffff)
+        mat.needsUpdate = true
+      }
+
+      // Якщо всі текстури провалились — залишаємо синій базовий колір
+      const onTextureFail = () => {
+        if (textureLoaded) return
+        const mat = globeMesh.material as THREE.MeshStandardMaterial
+        mat.color.set(0x0a1628)
+        mat.needsUpdate = true
       }
 
       const tryLoadTexture = (i: number) => {
-        if (i >= earthUrls.length) { applyFresnel(); return }
+        if (i >= earthUrls.length) { onTextureFail(); return }
         loader.load(earthUrls[i], applyTexture, undefined, () => tryLoadTexture(i + 1))
       }
       tryLoadTexture(0)
 
-      textureTimeoutId = setTimeout(applyFresnel, 3000)
+      textureTimeoutId = setTimeout(onTextureFail, 5000)
       cleanups.push(() => clearTimeout(textureTimeoutId))
+
+      // Normal map (рельєф суші)
+      loader.load(
+        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_normal_2048.jpg',
+        (normalTex) => {
+          const mat = globeMesh.material as THREE.MeshStandardMaterial
+          mat.normalMap = normalTex
+          mat.normalScale = new THREE.Vector2(0.6, 0.6)
+          mat.needsUpdate = true
+        },
+        undefined, () => {}
+      )
+
+      // Specular → roughnessMap (океан блищить)
+      loader.load(
+        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_specular_2048.jpg',
+        (specTex) => {
+          const mat = globeMesh.material as THREE.MeshStandardMaterial
+          mat.roughnessMap = specTex
+          mat.needsUpdate = true
+        },
+        undefined, () => {}
+      )
+
+      // Хмари
+      loader.load(
+        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_clouds_1024.png',
+        (cloudTex) => {
+          cloudMesh = new THREE.Mesh(
+            new THREE.SphereGeometry(1.005, 64, 64),
+            new THREE.MeshPhongMaterial({
+              map: cloudTex,
+              transparent: true,
+              opacity: 0.35,
+              depthWrite: false,
+            })
+          )
+          group.add(cloudMesh)
+        },
+        undefined, () => {}
+      )
 
       // ── МІСЯЦЬ ────────────────────────────────────────────────────────────
       const moonOrbit = new THREE.Group()
@@ -463,6 +492,7 @@ export default function HomePage() {
           rotY += 0.0005
           group.rotation.set(rotX, rotY, 0)
         }
+        if (cloudMesh) cloudMesh.rotation.y += 0.0002
         moonAngle += 0.001
         moonOrbit.rotation.y = moonAngle
         moonOrbit.rotation.x = Math.sin(moonAngle * 0.4) * 0.12
