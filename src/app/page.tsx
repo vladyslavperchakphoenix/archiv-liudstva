@@ -120,22 +120,23 @@ export default function HomePage() {
         })))
       })
 
-      // ── ОСВІТЛЕННЯ (NASA-стиль) ───────────────────────────────────────────
-      scene.add(new THREE.AmbientLight(0x111133, 0.4))
-      const sunLight = new THREE.DirectionalLight(0xfff5e0, 2.8)
+      // ── ОСВІТЛЕННЯ ─────────────────────────────────────────────────────────
+      scene.add(new THREE.AmbientLight(0x0a1a3a, 0.6))
+      const sunLight = new THREE.DirectionalLight(0xfffaf0, 3.5)
       sunLight.position.set(5, 2, 4)
       scene.add(sunLight)
-      scene.add(new THREE.HemisphereLight(0x0033aa, 0x000000, 0.3))
+      const blueLight = new THREE.DirectionalLight(0x0044ff, 0.8)
+      blueLight.position.set(-3, -1, -2)
+      scene.add(blueLight)
 
       // ── ГЛОБУС ────────────────────────────────────────────────────────────
       const group = new THREE.Group()
       scene.add(group)
 
       const globeGeo = new THREE.SphereGeometry(1, 64, 64)
-      const globeMat = new THREE.MeshStandardMaterial({
+      const globeMat = new THREE.MeshPhongMaterial({
         color: 0x1a3a6e,
-        roughness: 0.7,
-        metalness: 0.0,
+        shininess: 5,
       })
       const globeMesh = new THREE.Mesh(globeGeo, globeMat)
       group.add(globeMesh)
@@ -154,8 +155,8 @@ export default function HomePage() {
           fragmentShader: `
             varying vec3 vNormal;
             void main() {
-              float intensity = pow(0.7 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
-              gl_FragColor = vec4(0.1, 0.4, 1.0, 1.0) * intensity;
+              float intensity = pow(0.65 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 1.8);
+              gl_FragColor = vec4(0.0, 0.5, 1.0, 1.0) * intensity;
             }
           `,
           blending: THREE.AdditiveBlending,
@@ -165,84 +166,132 @@ export default function HomePage() {
         })
       ))
 
-      // ── ТЕКСТУРИ (NASA r128, каскад URL) ─────────────────────────────────
+      // ── ТЕКСТУРИ ─────────────────────────────────────────────────────────
       const loader = new THREE.TextureLoader()
 
-      const earthUrls = [
+      const EARTH_TEXTURES = [
+        'https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73909/world.topo.bathy.200412.3x5400x2700.jpg',
+        'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
         'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_atmos_2048.jpg',
-        'https://raw.githubusercontent.com/turban/webgl-earth/master/images/2_no_clouds_4k.jpg',
-        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/planets/earth_atmos_2048.jpg',
       ]
 
       let textureLoaded = false
       let textureTimeoutId: ReturnType<typeof setTimeout>
       let cloudMesh: THREE.Mesh | null = null
 
-      const applyTexture = (tex: THREE.Texture) => {
-        textureLoaded = true
-        clearTimeout(textureTimeoutId)
-        const mat = globeMesh.material as THREE.MeshStandardMaterial
-        mat.map = tex
+      // Підсилити кольори + згенерувати specular map програмно
+      const processImage = (img: HTMLImageElement): { earthTex: THREE.CanvasTexture, specTex: THREE.CanvasTexture | null } => {
+        const c = document.createElement('canvas')
+        c.width = img.width; c.height = img.height
+        const ctx = c.getContext('2d')!
+        ctx.drawImage(img, 0, 0)
+        let specTex: THREE.CanvasTexture | null = null
+        try {
+          const d = ctx.getImageData(0, 0, c.width, c.height)
+          const px = d.data
+          const sc = document.createElement('canvas')
+          sc.width = c.width; sc.height = c.height
+          const sctx = sc.getContext('2d')!
+          const sd = sctx.createImageData(c.width, c.height)
+          const sp = sd.data
+          for (let i = 0; i < px.length; i += 4) {
+            const r = px[i], g = px[i + 1], b = px[i + 2]
+            const ocean = b > r + 20 && b > g
+            if (ocean) {
+              px[i]     = Math.min(255, r * 0.6)
+              px[i + 1] = Math.min(255, g * 0.85)
+              px[i + 2] = Math.min(255, b * 1.3)
+              sp[i] = sp[i + 1] = sp[i + 2] = 210
+            } else {
+              px[i]     = Math.min(255, r * 1.1)
+              px[i + 1] = Math.min(255, g * 1.2)
+              px[i + 2] = Math.min(255, b * 0.8)
+              sp[i] = sp[i + 1] = sp[i + 2] = 20
+            }
+            px[i + 3] = 255; sp[i + 3] = 255
+          }
+          ctx.putImageData(d, 0, 0)
+          sctx.putImageData(sd, 0, 0)
+          specTex = new THREE.CanvasTexture(sc)
+        } catch { /* CORS — proceed без enhancement */ }
+        return { earthTex: new THREE.CanvasTexture(c), specTex }
+      }
+
+      const applyMaterial = (earthTex: THREE.Texture, specTex: THREE.Texture | null) => {
+        const mat = globeMesh.material as THREE.MeshPhongMaterial
+        mat.map = earthTex
         mat.color.set(0xffffff)
+        mat.specular = new THREE.Color(0x4488ff)
+        mat.shininess = 25
+        if (specTex) mat.specularMap = specTex
+        mat.emissiveMap = earthTex
+        mat.emissive = new THREE.Color(0x112244)
+        mat.emissiveIntensity = 0.08
         mat.needsUpdate = true
       }
 
-      // Якщо всі текстури провалились — залишаємо синій базовий колір
       const onTextureFail = () => {
         if (textureLoaded) return
-        const mat = globeMesh.material as THREE.MeshStandardMaterial
+        const mat = globeMesh.material as THREE.MeshPhongMaterial
         mat.color.set(0x0a1628)
         mat.needsUpdate = true
       }
 
-      const tryLoadTexture = (i: number) => {
-        if (i >= earthUrls.length) { onTextureFail(); return }
-        loader.load(earthUrls[i], applyTexture, undefined, () => tryLoadTexture(i + 1))
+      const tryLoad = (i: number) => {
+        if (i >= EARTH_TEXTURES.length) { onTextureFail(); return }
+        const url = EARTH_TEXTURES[i]
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => {
+          textureLoaded = true
+          clearTimeout(textureTimeoutId)
+          const { earthTex, specTex } = processImage(img)
+          applyMaterial(earthTex, specTex)
+        }
+        img.onerror = () => {
+          // CORS заблоковано — пробуємо без enhancement
+          loader.load(url, tex => {
+            textureLoaded = true
+            clearTimeout(textureTimeoutId)
+            applyMaterial(tex, null)
+          }, undefined, () => tryLoad(i + 1))
+        }
+        img.src = url
       }
-      tryLoadTexture(0)
+      tryLoad(0)
 
-      textureTimeoutId = setTimeout(onTextureFail, 5000)
+      textureTimeoutId = setTimeout(onTextureFail, 8000)
       cleanups.push(() => clearTimeout(textureTimeoutId))
 
-      // Normal map (рельєф суші)
+      // Normal map
       loader.load(
         'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_normal_2048.jpg',
-        (normalTex) => {
-          const mat = globeMesh.material as THREE.MeshStandardMaterial
-          mat.normalMap = normalTex
-          mat.normalScale = new THREE.Vector2(0.6, 0.6)
+        (t) => {
+          const mat = globeMesh.material as THREE.MeshPhongMaterial
+          mat.normalMap = t
+          mat.normalScale = new THREE.Vector2(0.8, 0.8)
           mat.needsUpdate = true
-        },
-        undefined, () => {}
-      )
-
-      // Specular → roughnessMap (океан блищить)
-      loader.load(
-        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_specular_2048.jpg',
-        (specTex) => {
-          const mat = globeMesh.material as THREE.MeshStandardMaterial
-          mat.roughnessMap = specTex
-          mat.needsUpdate = true
-        },
-        undefined, () => {}
+        }, undefined, () => {}
       )
 
       // Хмари
       loader.load(
         'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_clouds_1024.png',
-        (cloudTex) => {
+        (t) => {
           cloudMesh = new THREE.Mesh(
             new THREE.SphereGeometry(1.005, 64, 64),
             new THREE.MeshPhongMaterial({
-              map: cloudTex,
+              map: t,
               transparent: true,
-              opacity: 0.35,
+              opacity: 0.5,
               depthWrite: false,
+              emissive: new THREE.Color(0xffffff),
+              emissiveMap: t,
+              emissiveIntensity: 0.05,
             })
           )
           group.add(cloudMesh)
-        },
-        undefined, () => {}
+        }, undefined, () => {}
       )
 
       // ── МІСЯЦЬ ────────────────────────────────────────────────────────────
