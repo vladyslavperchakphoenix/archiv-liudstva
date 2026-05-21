@@ -81,7 +81,8 @@ export default function HomePage() {
 
       const scene = new THREE.Scene()
       const camera = new THREE.PerspectiveCamera(42, W() / H(), 0.1, 100)
-      camera.position.z = 2.2
+      const mobile = window.innerWidth < 768
+      camera.position.z = mobile ? 3.2 : 2.2
 
       // ── ЗІРКИ — sizeAttenuation:false → розмір у пікселях ──────────────
       ;[
@@ -415,7 +416,8 @@ export default function HomePage() {
       cleanups.push(() => canvas!.removeEventListener('click', onClick))
 
       const onWheel = (e: WheelEvent) => {
-        camera.position.z = Math.max(1.4, Math.min(4.0, camera.position.z + e.deltaY * 0.003))
+        const isMob = window.innerWidth < 768
+        camera.position.z = Math.max(isMob ? 2.5 : 1.5, Math.min(isMob ? 5.0 : 4.0, camera.position.z + e.deltaY * 0.003))
         e.preventDefault()
       }
       canvas!.addEventListener('wheel', onWheel, { passive: false })
@@ -444,6 +446,9 @@ export default function HomePage() {
         renderer.setSize(W(), H())
         camera.aspect = W() / H()
         camera.updateProjectionMatrix()
+        const isMob = window.innerWidth < 768
+        if (camera.position.z < (isMob ? 2.5 : 1.5)) camera.position.z = isMob ? 2.5 : 1.5
+        if (camera.position.z > (isMob ? 5.0 : 4.0)) camera.position.z = isMob ? 5.0 : 4.0
       }
       window.addEventListener('resize', onResize)
       cleanups.push(() => window.removeEventListener('resize', onResize))
