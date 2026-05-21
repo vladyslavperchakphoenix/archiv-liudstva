@@ -408,7 +408,7 @@ export default function HomePage() {
                 fillGeo.setAttribute('position', new THREE.BufferAttribute(triPos, 3))
                 fillGeo.computeBoundingSphere()
                 const fillMat = new THREE.MeshBasicMaterial({
-                  color: NATION_COLORS[id] ? new THREE.Color(NATION_COLORS[id]) : new THREE.Color(0xffffff),
+                  color: new THREE.Color(0xffdd00),
                   transparent: true, opacity: 0,
                   side: THREE.DoubleSide, depthWrite: false,
                   polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
@@ -598,7 +598,7 @@ export default function HomePage() {
         moonOrbit.rotation.x = Math.sin(moonAngle * 0.4) * 0.12
         countryFillMap.forEach((mesh, id) => {
           const mat = mesh.material as THREE.MeshBasicMaterial
-          const target = id === hoveredId ? (NATION_COLORS[id] ? 0.45 : 0.22) : 0
+          const target = id === hoveredId ? 0.4 : 0
           if (Math.abs(mat.opacity - target) > 0.001) {
             mat.opacity += (target - mat.opacity) * 0.18
           }
