@@ -1,3 +1,5 @@
+export type Continent = 'europe' | 'asia' | 'americas' | 'africa' | 'oceania'
+
 export type NationData = {
   name: string
   flag: string
@@ -7,6 +9,7 @@ export type NationData = {
   essenceWords: string
   superpower: string
   achillesHeel: string
+  continent: Continent
   matrix: { key: string; val: string }[]
   culturalCode: {
     philosophy: string
@@ -29,6 +32,7 @@ export const NATIONS_DATA: Record<string, NationData> = {
     soulDesc: 'Гармонія через підпорядкування колективному ритму',
     color: '#BC2D35',
     essenceWords: 'Ізоляція · Перфекціонізм · Ефемерність',
+    continent: 'asia',
     superpower: 'Зведення будь-якої справи до рівня мистецтва. Чай, меч, код, кухня — все стає сакральним актом.',
     achillesHeel: 'Суспільний тиск conformity нищить індивідуальність. "Цвях що стирчить — забивають". Hikikomori як симптом системи.',
     matrix: [
@@ -58,6 +62,7 @@ export const NATIONS_DATA: Record<string, NationData> = {
     soulDesc: 'Солодка туга за втраченим золотим віком',
     color: '#c8a84b',
     essenceWords: 'Туга · Відкриття · Змиренність',
+    continent: 'europe',
     superpower: 'Навігація невідомого — фізично, емоційно, художньо. Найбільша торгова імперія XVI ст. з населенням лише 1 млн.',
     achillesHeel: 'Себастіанізм — пасивне очікування чудесного порятунку замість дії. Активується в кризу.',
     matrix: [
@@ -87,6 +92,7 @@ export const NATIONS_DATA: Record<string, NationData> = {
     soulDesc: 'Свобода яку береш сам і відстоюєш',
     color: '#ffd700',
     essenceWords: 'Воля · Спротив · Рій',
+    continent: 'europe',
     superpower: 'Самоорганізація без центру. Майдан, волонтери, тероборона — рій що самоскладається за 48 годин.',
     achillesHeel: 'Отаманщина — "Де два українці — три гетьмани". Горизонтальна сила без координації.',
     matrix: [
@@ -116,6 +122,7 @@ export const NATIONS_DATA: Record<string, NationData> = {
     soulDesc: 'Стриманість перед лицем катастрофи',
     color: '#85b7eb',
     essenceWords: 'Стриманість · Острівність · Прагматизм',
+    continent: 'europe',
     superpower: 'Інституціоналізація всього. Парламент, Common Law, BBC — правила що пережили монархів і епохи.',
     achillesHeel: 'Острівне самозамикання — Brexit як сучасний прояв. "Туман над Ла-Маншем, континент ізольований."',
     matrix: [
@@ -145,6 +152,7 @@ export const NATIONS_DATA: Record<string, NationData> = {
     soulDesc: 'Мистецтво знаходити лазівки з посмішкою',
     color: '#5DCAA5',
     essenceWords: 'Радість · Тигель · Гнучкість',
+    continent: 'americas',
     superpower: 'Переплавити будь-який вплив у щось своє. Африка + Португалія + Індій = samba, capoeira, feijoada.',
     achillesHeel: '"Rouba mas faz" — толерантність до корупції що унеможливлює системний розвиток.',
     matrix: [
@@ -174,6 +182,7 @@ export const NATIONS_DATA: Record<string, NationData> = {
     soulDesc: 'Людина яка створила себе сама',
     color: '#ED937B',
     essenceWords: 'Амбіція · Свобода · Перформанс',
+    continent: 'americas',
     superpower: 'Перетворення мрії на бізнес-модель. Голлівуд, Кремнієва долина, NASA — ідея як стартап.',
     achillesHeel: 'Соціальний дарвінізм — якщо бідний, значить слабкий. Системна нерівність невидима для себе.',
     matrix: [
