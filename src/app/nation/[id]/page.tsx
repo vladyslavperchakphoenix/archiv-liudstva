@@ -4,7 +4,7 @@ import { use, useState, useEffect } from 'react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import {
-  ResponsiveContainer, LineChart, Line, BarChart, Bar,
+  LineChart, Line, BarChart, Bar,
   XAxis, YAxis, Tooltip, ReferenceLine,
 } from 'recharts'
 import { NATIONS_DATA } from '@/lib/nations'
@@ -628,6 +628,8 @@ function EconomicsTab({ econ, color, isPremium, isMobile }: {
   econ: EconData; color: string; isPremium: boolean; isMobile: boolean; nationId: string
 }) {
   const gdpFree = econ.gdpHistory.filter(d => d.year >= 2020)
+  // Explicit pixel width — ResponsiveContainer breaks on mobile (gets 0 from ResizeObserver)
+  const cw = isMobile ? Math.max(window.innerWidth - 72, 260) : 640
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
@@ -651,18 +653,16 @@ function EconomicsTab({ econ, color, isPremium, isMobile }: {
       </div>
 
       {/* FREE: ВВП 2020–2023 */}
-      <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px' }}>
+      <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px', overflowX: 'hidden' }}>
         <p style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', fontWeight: 600, margin: '0 0 12px' }}>
           ВВП динаміка (млрд $) · 2020–2023
         </p>
-        <ResponsiveContainer width="100%" height={180}>
-          <LineChart data={gdpFree}>
-            <XAxis dataKey="year" stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
-            <YAxis stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
-            <Tooltip contentStyle={{ background: '#0d1628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', fontSize: 12 }} />
-            <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={{ fill: color, r: 4 }} />
-          </LineChart>
-        </ResponsiveContainer>
+        <LineChart width={cw} height={180} data={gdpFree}>
+          <XAxis dataKey="year" stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
+          <YAxis stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
+          <Tooltip contentStyle={{ background: '#0d1628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', fontSize: 12 }} />
+          <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={{ fill: color, r: 4 }} />
+        </LineChart>
       </div>
 
       {/* FREE: перше питання архетипу */}
@@ -677,7 +677,7 @@ function EconomicsTab({ econ, color, isPremium, isMobile }: {
         <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 1.7 }}>{econ.archetypeAnalysis[0].answer}</div>
       </div>
 
-      {/* PREMIUM: весь інший контент — один блок, без overflow:hidden */}
+      {/* PREMIUM: весь інший контент */}
       <div style={{ position: 'relative' }}>
         <div style={{ filter: isPremium ? 'none' : 'blur(5px)', pointerEvents: isPremium ? 'auto' : 'none', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
@@ -690,65 +690,57 @@ function EconomicsTab({ econ, color, isPremium, isMobile }: {
           </div>
 
           {/* ВВП 2014–2023 */}
-          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px' }}>
+          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px', overflowX: 'hidden' }}>
             <p style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', fontWeight: 600, margin: '0 0 12px' }}>
               ВВП повна динаміка (млрд $) · 2014–2023
             </p>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={econ.gdpHistory}>
-                <XAxis dataKey="year" stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} />
-                <YAxis stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} />
-                <Tooltip contentStyle={{ background: '#0d1628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', fontSize: 12 }} />
-                <ReferenceLine x={2014} stroke="rgba(255,200,0,0.5)" strokeDasharray="4 4" label={{ value: 'Майдан', fill: 'rgba(255,200,0,0.6)', fontSize: 9 }} />
-                <ReferenceLine x={2022} stroke="rgba(255,100,100,0.5)" strokeDasharray="4 4" label={{ value: 'Вторгнення', fill: 'rgba(255,100,100,0.6)', fontSize: 9 }} />
-                <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={{ fill: color, r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
+            <LineChart width={cw} height={200} data={econ.gdpHistory}>
+              <XAxis dataKey="year" stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} />
+              <YAxis stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} />
+              <Tooltip contentStyle={{ background: '#0d1628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', fontSize: 12 }} />
+              <ReferenceLine x={2014} stroke="rgba(255,200,0,0.5)" strokeDasharray="4 4" label={{ value: 'Майдан', fill: 'rgba(255,200,0,0.6)', fontSize: 9 }} />
+              <ReferenceLine x={2022} stroke="rgba(255,100,100,0.5)" strokeDasharray="4 4" label={{ value: 'Вторгнення', fill: 'rgba(255,100,100,0.6)', fontSize: 9 }} />
+              <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={{ fill: color, r: 3 }} />
+            </LineChart>
           </div>
 
           {/* Мінімальна зарплата */}
-          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px' }}>
+          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px', overflowX: 'hidden' }}>
             <p style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', fontWeight: 600, margin: '0 0 12px' }}>
               Мінімальна зарплата ($/міс)
             </p>
-            <ResponsiveContainer width="100%" height={160}>
-              <BarChart data={econ.minWageHistory}>
-                <XAxis dataKey="year" stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
-                <YAxis stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: '#0d1628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', fontSize: 12 }} />
-                <Bar dataKey="value" fill={color} opacity={0.8} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <BarChart width={cw} height={160} data={econ.minWageHistory}>
+              <XAxis dataKey="year" stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
+              <YAxis stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
+              <Tooltip contentStyle={{ background: '#0d1628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', fontSize: 12 }} />
+              <Bar dataKey="value" fill={color} opacity={0.8} radius={[4, 4, 0, 0]} />
+            </BarChart>
           </div>
 
           {/* Інфляція */}
-          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px' }}>
+          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px', overflowX: 'hidden' }}>
             <p style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', fontWeight: 600, margin: '0 0 12px' }}>
               Інфляція (%)
             </p>
-            <ResponsiveContainer width="100%" height={160}>
-              <LineChart data={econ.inflationHistory}>
-                <XAxis dataKey="year" stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
-                <YAxis stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: '#0d1628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', fontSize: 12 }} />
-                <Line type="monotone" dataKey="value" stroke="#ED937B" strokeWidth={2} dot={{ fill: '#ED937B', r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
+            <LineChart width={cw} height={160} data={econ.inflationHistory}>
+              <XAxis dataKey="year" stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
+              <YAxis stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
+              <Tooltip contentStyle={{ background: '#0d1628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', fontSize: 12 }} />
+              <Line type="monotone" dataKey="value" stroke="#ED937B" strokeWidth={2} dot={{ fill: '#ED937B', r: 3 }} />
+            </LineChart>
           </div>
 
           {/* Безробіття */}
-          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px' }}>
+          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px', overflowX: 'hidden' }}>
             <p style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', fontWeight: 600, margin: '0 0 12px' }}>
               Безробіття (%)
             </p>
-            <ResponsiveContainer width="100%" height={160}>
-              <BarChart data={econ.unemploymentHistory}>
-                <XAxis dataKey="year" stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
-                <YAxis stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: '#0d1628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', fontSize: 12 }} />
-                <Bar dataKey="value" fill="#ED937B" opacity={0.7} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <BarChart width={cw} height={160} data={econ.unemploymentHistory}>
+              <XAxis dataKey="year" stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
+              <YAxis stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
+              <Tooltip contentStyle={{ background: '#0d1628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', fontSize: 12 }} />
+              <Bar dataKey="value" fill="#ED937B" opacity={0.7} radius={[4, 4, 0, 0]} />
+            </BarChart>
           </div>
 
           {/* Структура економіки */}
