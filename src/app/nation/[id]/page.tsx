@@ -596,7 +596,7 @@ function SimpleLineChart({ data, color, height = 160, refLines }: {
   const step = Math.ceil(data.length / 5)
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{ display: 'block', maxWidth: '100%' }}>
       {[0, 0.5, 1].map(t => (
         <line key={t} x1={pad.l} y1={H - pad.b - t * cH} x2={W - pad.r} y2={H - pad.b - t * cH}
           stroke="rgba(255,255,255,0.07)" strokeWidth={1} />
@@ -644,7 +644,7 @@ function SimpleBarChart({ data, color, height = 140 }: {
   const bW = slot * 0.65
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{ display: 'block', maxWidth: '100%' }}>
       {[0, 0.5, 1].map(t => (
         <line key={t} x1={pad.l} y1={H - pad.b - t * cH} x2={W - pad.r} y2={H - pad.b - t * cH}
           stroke="rgba(255,255,255,0.07)" strokeWidth={1} />
@@ -734,8 +734,8 @@ function EconomicsTab({ econ, color, isPremium, isMobile }: {
       </div>
 
       {/* PREMIUM: весь інший контент */}
-      <div style={{ position: 'relative' }}>
-        <div style={{ filter: isPremium ? 'none' : 'blur(5px)', pointerEvents: isPremium ? 'auto' : 'none', display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {isPremium ? (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
           {/* 4 premium метрики */}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr 1fr', gap: 10 }}>
@@ -841,32 +841,26 @@ function EconomicsTab({ econ, color, isPremium, isMobile }: {
             ))}
           </div>
 
-        </div>
-
-        {!isPremium && (
-          <div style={{
-            position: 'absolute', inset: 0,
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(4,8,15,0.82)', borderRadius: 12,
-            gap: 12,
-          }}>
-            <span style={{ fontSize: 28 }}>🔒</span>
-            <p style={{ fontSize: 15, fontWeight: 500, color: 'white', margin: 0 }}>Premium контент</p>
-            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', textAlign: 'center', maxWidth: 240, lineHeight: 1.5, margin: 0 }}>
-              Графіки динаміки · Структура · Архетип аналіз
-            </p>
-            <Link href="/profile" style={{
-              background: color, color: '#04080f',
-              padding: '10px 24px', borderRadius: 8,
-              fontSize: 13, fontWeight: 500,
-              textDecoration: 'none', marginTop: 4,
-            }}>
-              Розблокувати Premium →
-            </Link>
-          </div>
-        )}
       </div>
+      ) : (
+        <div style={{
+          border: `1px solid ${color}33`, borderRadius: 12,
+          padding: 24, textAlign: 'center',
+        }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>🔒</div>
+          <div style={{ fontSize: 15, fontWeight: 500, color: 'white', marginBottom: 8 }}>Premium контент</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 20, lineHeight: 1.6 }}>
+            Графіки динаміки · Структура · Архетип аналіз
+          </div>
+          <Link href="/profile" style={{
+            display: 'inline-block', background: color, color: '#04080f',
+            padding: '10px 24px', borderRadius: 8,
+            fontSize: 13, fontWeight: 500, textDecoration: 'none',
+          }}>
+            Розблокувати Premium →
+          </Link>
+        </div>
+      )}
 
     </div>
   )
