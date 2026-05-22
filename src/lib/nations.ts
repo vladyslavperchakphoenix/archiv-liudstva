@@ -1,5 +1,16 @@
 export type Continent = 'europe' | 'asia' | 'americas' | 'africa' | 'oceania'
 
+export type TabItem = {
+  name: string
+  desc: string
+  isPremium: boolean
+}
+
+export type TabSectionData = {
+  intro: string
+  items: TabItem[]
+}
+
 export type NationData = {
   name: string
   flag: string
@@ -39,6 +50,22 @@ export type NationData = {
     desc: string
     isPremium: boolean
   }>
+  economics?: {
+    gdp: string
+    gdpPerCapita: string
+    population: string
+    happinessIndex: string
+    corruptionIndex: string
+    humanDevelopment: string
+  }
+  tabs?: {
+    philosophy?: TabSectionData
+    music?: TabSectionData
+    art?: TabSectionData
+    science?: TabSectionData
+    conflicts?: TabSectionData
+    memes?: TabSectionData
+  }
 }
 
 export const NATIONS_DATA: Record<string, NationData> = {
@@ -279,6 +306,64 @@ export const NATIONS_DATA: Record<string, NationData> = {
         isPremium: true,
       },
     ],
+    economics: {
+      gdp: '$160 млрд',
+      gdpPerCapita: '$4,300',
+      population: '37 млн',
+      happinessIndex: '5.1 / 10',
+      corruptionIndex: '36 / 100',
+      humanDevelopment: '0.773',
+    },
+    tabs: {
+      philosophy: {
+        intro: 'Українська філософія народилась не в університетах а в степу і тюрмах.',
+        items: [
+          { name: 'Григорій Сковорода', desc: 'Мандрівний філософ. Пізнай себе — головний принцип.', isPremium: false },
+          { name: 'Памфіл Юркевич', desc: 'Філософія серця — унікальна українська концепція.', isPremium: false },
+          { name: 'Микола Костомаров', desc: 'Народознавство як філософія нації.', isPremium: true },
+        ],
+      },
+      music: {
+        intro: 'Музика України — від кобзарів до Океану Ельзи. Завжди про свободу або втрату.',
+        items: [
+          { name: 'Кобзарська традиція', desc: 'Сліпі мандрівні музиканти несли пам\'ять нації.', isPremium: false },
+          { name: 'Океан Ельзи', desc: 'Святослав Вакарчук — голос покоління Майдану.', isPremium: false },
+          { name: 'Даха Браха', desc: 'Етно-хаос — архетип Волі у сучасній музиці.', isPremium: true },
+        ],
+      },
+      art: {
+        intro: 'Українське мистецтво балансує між народним і авангардом.',
+        items: [
+          { name: 'Тарас Шевченко', desc: 'Художник і поет — символ нації.', isPremium: false },
+          { name: 'Марія Приймаченко', desc: 'Наївне мистецтво яке Пікассо називав геніальним.', isPremium: false },
+          { name: 'Казимир Малевич', desc: 'Батько супрематизму народився в Києві.', isPremium: true },
+        ],
+      },
+      science: {
+        intro: 'Українські вчені змінили світ — часто під іншими прапорами.',
+        items: [
+          { name: 'Ілля Мечников', desc: 'Нобелівська премія — відкрив імунітет.', isPremium: false },
+          { name: 'Сергій Корольов', desc: 'Батько космонавтики. Запустив Супутник і Гагаріна.', isPremium: false },
+          { name: 'Георгій Гамов', desc: 'Теорія Великого Вибуху і розшифровка ДНК.', isPremium: true },
+        ],
+      },
+      conflicts: {
+        intro: 'Конфлікти сформували українську психіку більше ніж будь-що інше.',
+        items: [
+          { name: 'Голодомор 1932–33', desc: 'Геноцид голодом. 3–7 млн загиблих. Досі відкрита рана.', isPremium: false },
+          { name: 'Чорнобиль 1986', desc: 'Катастрофа яка прискорила розпад СРСР.', isPremium: false },
+          { name: 'Повномасштабне вторгнення 2022', desc: 'Визначальна подія для всього покоління.', isPremium: true },
+        ],
+      },
+      memes: {
+        intro: 'Українські меми — це зброя. Гумор як спосіб вижити і перемогти.',
+        items: [
+          { name: 'Русскій воєнний корабль', desc: 'Одна фраза стала символом спротиву.', isPremium: false },
+          { name: 'Байрактар', desc: 'Пісня про дрон стала народним гімном.', isPremium: false },
+          { name: 'Меми ЗСУ', desc: 'Армія що воює і жартує одночасно.', isPremium: true },
+        ],
+      },
+    },
   },
 
   '826': {
