@@ -3,10 +3,6 @@
 import { use, useState, useEffect } from 'react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import {
-  LineChart, Line, BarChart, Bar,
-  XAxis, YAxis, Tooltip, ReferenceLine,
-} from 'recharts'
 import { NATIONS_DATA } from '@/lib/nations'
 import { getUserPlan } from '@/lib/supabase/getPlan'
 
@@ -579,30 +575,97 @@ function CrossLinks({ currentId, activeTab, color }: {
 
 type EconData = NonNullable<(typeof NATIONS_DATA)[string]['economics']>
 
-const TOOLTIP_STYLE = {
-  contentStyle: {
-    background: '#0d1628',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 8,
-    color: 'white',
-    fontSize: 12,
-  },
-}
+type DataPoint = { year: number; value: number }
 
-const AXIS_PROPS = {
-  stroke: 'rgba(255,255,255,0.15)',
-  fontSize: 11,
-  tick: { fill: 'rgba(255,255,255,0.4)' },
-}
+function SimpleLineChart({ data, color, height = 160, refLines }: {
+  data: DataPoint[]
+  color: string
+  height?: number
+  refLines?: { x: number; label: string; stroke: string }[]
+}) {
+  const W = 280, H = height
+  const pad = { t: 10, r: 10, b: 26, l: 38 }
+  const cW = W - pad.l - pad.r
+  const cH = H - pad.t - pad.b
+  const vals = data.map(d => d.value)
+  const mn = Math.min(...vals), mx = Math.max(...vals)
+  const rng = mx - mn || 1
+  const px = (i: number) => pad.l + (i / (data.length - 1)) * cW
+  const py = (v: number) => H - pad.b - ((v - mn) / rng) * cH
+  const pts = data.map((d, i) => `${px(i)},${py(d.value)}`).join(' ')
+  const step = Math.ceil(data.length / 5)
 
-function ChartLabel({ label }: { label: string }) {
   return (
-    <div style={{
-      fontSize: '11px', letterSpacing: '0.12em', textTransform: 'uppercase',
-      color: 'rgba(255,255,255,0.3)', fontWeight: 600, marginBottom: '12px',
-    }}>
-      {label}
-    </div>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+      {[0, 0.5, 1].map(t => (
+        <line key={t} x1={pad.l} y1={H - pad.b - t * cH} x2={W - pad.r} y2={H - pad.b - t * cH}
+          stroke="rgba(255,255,255,0.07)" strokeWidth={1} />
+      ))}
+      {refLines?.map(rl => {
+        const idx = data.findIndex(d => d.year === rl.x)
+        if (idx < 0) return null
+        const rx = px(idx)
+        return (
+          <g key={rl.x}>
+            <line x1={rx} y1={pad.t} x2={rx} y2={H - pad.b} stroke={rl.stroke} strokeWidth={1} strokeDasharray="3 3" />
+            <text x={rx + 3} y={pad.t + 9} fill={rl.stroke} fontSize={8}>{rl.label}</text>
+          </g>
+        )
+      })}
+      <polyline points={pts} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      {data.map((d, i) => (
+        <circle key={i} cx={px(i)} cy={py(d.value)} r={3} fill={color} />
+      ))}
+      {data.map((d, i) => (
+        (i % step === 0 || i === data.length - 1)
+          ? <text key={i} x={px(i)} y={H - 7} textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize={8}>{d.year}</text>
+          : null
+      ))}
+      {[0, 0.5, 1].map(t => (
+        <text key={t} x={pad.l - 4} y={H - pad.b - t * cH + 4} textAnchor="end" fill="rgba(255,255,255,0.3)" fontSize={8}>
+          {Math.round(mn + t * rng)}
+        </text>
+      ))}
+    </svg>
+  )
+}
+
+function SimpleBarChart({ data, color, height = 140 }: {
+  data: DataPoint[]
+  color: string
+  height?: number
+}) {
+  const W = 280, H = height
+  const pad = { t: 5, r: 5, b: 26, l: 38 }
+  const cW = W - pad.l - pad.r
+  const cH = H - pad.t - pad.b
+  const mx = Math.max(...data.map(d => d.value))
+  const slot = cW / data.length
+  const bW = slot * 0.65
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+      {[0, 0.5, 1].map(t => (
+        <line key={t} x1={pad.l} y1={H - pad.b - t * cH} x2={W - pad.r} y2={H - pad.b - t * cH}
+          stroke="rgba(255,255,255,0.07)" strokeWidth={1} />
+      ))}
+      {data.map((d, i) => {
+        const bH = Math.max((d.value / mx) * cH, 2)
+        const bx = pad.l + i * slot + (slot - bW) / 2
+        const by = H - pad.b - bH
+        return (
+          <g key={i}>
+            <rect x={bx} y={by} width={bW} height={bH} fill={color} opacity={0.8} rx={2} />
+            <text x={bx + bW / 2} y={H - 7} textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize={8}>{d.year}</text>
+          </g>
+        )
+      })}
+      {[0, 0.5, 1].map(t => (
+        <text key={t} x={pad.l - 4} y={H - pad.b - t * cH + 4} textAnchor="end" fill="rgba(255,255,255,0.3)" fontSize={8}>
+          {Math.round(mx * t)}
+        </text>
+      ))}
+    </svg>
   )
 }
 
@@ -628,8 +691,6 @@ function EconomicsTab({ econ, color, isPremium, isMobile }: {
   econ: EconData; color: string; isPremium: boolean; isMobile: boolean; nationId: string
 }) {
   const gdpFree = econ.gdpHistory.filter(d => d.year >= 2020)
-  // Explicit pixel width — ResponsiveContainer breaks on mobile (gets 0 from ResizeObserver)
-  const cw = isMobile ? Math.max(window.innerWidth - 72, 260) : 640
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
@@ -653,16 +714,11 @@ function EconomicsTab({ econ, color, isPremium, isMobile }: {
       </div>
 
       {/* FREE: ВВП 2020–2023 */}
-      <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px', overflowX: 'hidden' }}>
+      <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px' }}>
         <p style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', fontWeight: 600, margin: '0 0 12px' }}>
           ВВП динаміка (млрд $) · 2020–2023
         </p>
-        <LineChart width={cw} height={180} data={gdpFree}>
-          <XAxis dataKey="year" stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
-          <YAxis stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
-          <Tooltip contentStyle={{ background: '#0d1628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', fontSize: 12 }} />
-          <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={{ fill: color, r: 4 }} />
-        </LineChart>
+        <SimpleLineChart data={gdpFree} color={color} height={160} />
       </div>
 
       {/* FREE: перше питання архетипу */}
@@ -690,57 +746,40 @@ function EconomicsTab({ econ, color, isPremium, isMobile }: {
           </div>
 
           {/* ВВП 2014–2023 */}
-          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px', overflowX: 'hidden' }}>
+          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px' }}>
             <p style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', fontWeight: 600, margin: '0 0 12px' }}>
               ВВП повна динаміка (млрд $) · 2014–2023
             </p>
-            <LineChart width={cw} height={200} data={econ.gdpHistory}>
-              <XAxis dataKey="year" stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} />
-              <YAxis stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} />
-              <Tooltip contentStyle={{ background: '#0d1628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', fontSize: 12 }} />
-              <ReferenceLine x={2014} stroke="rgba(255,200,0,0.5)" strokeDasharray="4 4" label={{ value: 'Майдан', fill: 'rgba(255,200,0,0.6)', fontSize: 9 }} />
-              <ReferenceLine x={2022} stroke="rgba(255,100,100,0.5)" strokeDasharray="4 4" label={{ value: 'Вторгнення', fill: 'rgba(255,100,100,0.6)', fontSize: 9 }} />
-              <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={{ fill: color, r: 3 }} />
-            </LineChart>
+            <SimpleLineChart data={econ.gdpHistory} color={color} height={180}
+              refLines={[
+                { x: 2014, label: 'Майдан', stroke: 'rgba(255,200,0,0.6)' },
+                { x: 2022, label: 'Вторгнення', stroke: 'rgba(255,100,100,0.7)' },
+              ]}
+            />
           </div>
 
           {/* Мінімальна зарплата */}
-          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px', overflowX: 'hidden' }}>
+          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px' }}>
             <p style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', fontWeight: 600, margin: '0 0 12px' }}>
               Мінімальна зарплата ($/міс)
             </p>
-            <BarChart width={cw} height={160} data={econ.minWageHistory}>
-              <XAxis dataKey="year" stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
-              <YAxis stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
-              <Tooltip contentStyle={{ background: '#0d1628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', fontSize: 12 }} />
-              <Bar dataKey="value" fill={color} opacity={0.8} radius={[4, 4, 0, 0]} />
-            </BarChart>
+            <SimpleBarChart data={econ.minWageHistory} color={color} height={140} />
           </div>
 
           {/* Інфляція */}
-          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px', overflowX: 'hidden' }}>
+          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px' }}>
             <p style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', fontWeight: 600, margin: '0 0 12px' }}>
               Інфляція (%)
             </p>
-            <LineChart width={cw} height={160} data={econ.inflationHistory}>
-              <XAxis dataKey="year" stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
-              <YAxis stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
-              <Tooltip contentStyle={{ background: '#0d1628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', fontSize: 12 }} />
-              <Line type="monotone" dataKey="value" stroke="#ED937B" strokeWidth={2} dot={{ fill: '#ED937B', r: 3 }} />
-            </LineChart>
+            <SimpleLineChart data={econ.inflationHistory} color="#ED937B" height={140} />
           </div>
 
           {/* Безробіття */}
-          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px', overflowX: 'hidden' }}>
+          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px' }}>
             <p style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', fontWeight: 600, margin: '0 0 12px' }}>
               Безробіття (%)
             </p>
-            <BarChart width={cw} height={160} data={econ.unemploymentHistory}>
-              <XAxis dataKey="year" stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
-              <YAxis stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
-              <Tooltip contentStyle={{ background: '#0d1628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', fontSize: 12 }} />
-              <Bar dataKey="value" fill="#ED937B" opacity={0.7} radius={[4, 4, 0, 0]} />
-            </BarChart>
+            <SimpleBarChart data={econ.unemploymentHistory} color="#ED937B" height={140} />
           </div>
 
           {/* Структура економіки */}
