@@ -3,6 +3,10 @@
 import { use, useState, useEffect } from 'react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import {
+  ResponsiveContainer, LineChart, Line, BarChart, Bar,
+  XAxis, YAxis, Tooltip, ReferenceLine,
+} from 'recharts'
 import { NATIONS_DATA } from '@/lib/nations'
 import { getUserPlan } from '@/lib/supabase/getPlan'
 
@@ -19,14 +23,6 @@ const TABS = [
   { id: 'memes',      label: 'Меми' },
 ]
 
-const ECON_LABELS: Record<string, { label: string; context: string }> = {
-  gdp:              { label: 'ВВП',            context: 'Загальний обсяг економіки' },
-  gdpPerCapita:     { label: 'ВВП на особу',   context: 'Середній дохід на людину' },
-  population:       { label: 'Населення',      context: 'Станом на 2024' },
-  happinessIndex:   { label: 'Індекс щастя',   context: 'World Happiness Report' },
-  corruptionIndex:  { label: 'Індекс корупції',context: 'Transparency International' },
-  humanDevelopment: { label: 'ІЛР',            context: 'Human Development Index' },
-}
 
 export default function NationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -368,52 +364,9 @@ export default function NationPage({ params }: { params: Promise<{ id: string }>
           {activeTab === 'economics' && (
             <section style={{ paddingBottom: '40px' }}>
               {nation.economics ? (
-                <>
-                  <SectionHeader label="Економічні показники">
-                    <FreeLabel text="Безкоштовно" />
-                  </SectionHeader>
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr',
-                    gap: '10px',
-                  }}>
-                    {(Object.entries(nation.economics) as [string, string][]).map(([key, value]) => {
-                      const meta = ECON_LABELS[key]
-                      return (
-                        <div key={key} style={{
-                          background: 'rgba(255,255,255,0.025)',
-                          border: '1px solid rgba(255,255,255,0.07)',
-                          borderRadius: '12px', padding: '18px 16px',
-                        }}>
-                          <div style={{
-                            fontSize: isMobile ? '20px' : '22px',
-                            fontWeight: 600, color: c,
-                            letterSpacing: '-0.01em', lineHeight: 1.1, marginBottom: '6px',
-                          }}>
-                            {value}
-                          </div>
-                          <div style={{
-                            fontSize: '11px', letterSpacing: '0.08em',
-                            color: 'rgba(255,255,255,0.4)',
-                            textTransform: 'uppercase', fontWeight: 600, marginBottom: '4px',
-                          }}>
-                            {meta?.label ?? key}
-                          </div>
-                          {meta?.context && (
-                            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.22)', lineHeight: 1.4 }}>
-                              {meta.context}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </>
+                <EconomicsTab econ={nation.economics} color={c} isPremium={isPremium} isMobile={isMobile} nationId={id} />
               ) : (
-                <div style={{
-                  padding: '60px 0', textAlign: 'center',
-                  color: 'rgba(255,255,255,0.2)', fontSize: '14px',
-                }}>
+                <div style={{ padding: '60px 0', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '14px' }}>
                   Економічні дані скоро з'являться
                 </div>
               )}
@@ -618,6 +571,297 @@ function CrossLinks({ currentId, activeTab, color }: {
           </Link>
         ))}
       </div>
+    </div>
+  )
+}
+
+// ─── EconomicsTab ────────────────────────────────────────────────────────────
+
+type EconData = NonNullable<(typeof NATIONS_DATA)[string]['economics']>
+
+const TOOLTIP_STYLE = {
+  contentStyle: {
+    background: '#0d1628',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 8,
+    color: 'white',
+    fontSize: 12,
+  },
+}
+
+const AXIS_PROPS = {
+  stroke: 'rgba(255,255,255,0.15)',
+  fontSize: 11,
+  tick: { fill: 'rgba(255,255,255,0.4)' },
+}
+
+function ChartLabel({ label }: { label: string }) {
+  return (
+    <div style={{
+      fontSize: '11px', letterSpacing: '0.12em', textTransform: 'uppercase',
+      color: 'rgba(255,255,255,0.3)', fontWeight: 600, marginBottom: '12px',
+    }}>
+      {label}
+    </div>
+  )
+}
+
+function PremiumBlock({ isPremium, children }: { isPremium: boolean; children: React.ReactNode }) {
+  return (
+    <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ filter: isPremium ? 'none' : 'blur(5px)', pointerEvents: isPremium ? 'auto' : 'none' }}>
+        {children}
+      </div>
+      {!isPremium && (
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(4,8,15,0.75)', borderRadius: 12,
+          gap: 8,
+        }}>
+          <span style={{ fontSize: 20 }}>🔒</span>
+          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>Premium</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MetricCard({ label, value, unit, color }: { label: string; value: number; unit: string; color: string }) {
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.025)',
+      border: '1px solid rgba(255,255,255,0.07)',
+      borderRadius: 12, padding: '18px 16px',
+    }}>
+      <div style={{ fontSize: 22, fontWeight: 600, color, letterSpacing: '-0.01em', lineHeight: 1.1, marginBottom: 6 }}>
+        {value}{unit.startsWith('/') || unit.startsWith('І') ? '' : ' '}{unit}
+      </div>
+      <div style={{ fontSize: 11, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', fontWeight: 600 }}>
+        {label}
+      </div>
+    </div>
+  )
+}
+
+function EconomicsTab({ econ, color, isPremium, isMobile, nationId }: {
+  econ: EconData; color: string; isPremium: boolean; isMobile: boolean; nationId: string
+}) {
+  const gdpFree = econ.gdpHistory.filter(d => d.year >= 2020)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+
+      {/* ── FREE: 3 метрики ── */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 3, height: 18, borderRadius: 2, background: 'rgba(255,255,255,0.2)' }} />
+            <span style={{ fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
+              Ключові показники
+            </span>
+          </div>
+          <FreeLabel text="Безкоштовно" />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr', gap: 10 }}>
+          <MetricCard label="ВВП" value={econ.gdp.value} unit={econ.gdp.unit} color={color} />
+          <MetricCard label="Населення" value={econ.population.value} unit={econ.population.unit} color={color} />
+          <MetricCard label="Індекс щастя" value={econ.happinessRank.value} unit={econ.happinessRank.unit} color={color} />
+        </div>
+      </div>
+
+      {/* ── FREE: ВВП 2020–2023 ── */}
+      <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px' }}>
+        <ChartLabel label="ВВП (млрд $) · 2020–2023" />
+        <ResponsiveContainer width="100%" height={180}>
+          <LineChart data={gdpFree}>
+            <XAxis dataKey="year" {...AXIS_PROPS} />
+            <YAxis {...AXIS_PROPS} />
+            <Tooltip {...TOOLTIP_STYLE} />
+            <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={{ fill: color, r: 4 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* ── FREE: перше питання ── */}
+      <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <span style={{ fontSize: 16 }}>💡</span>
+          <span style={{ fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
+            Економіка через архетип
+          </span>
+        </div>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 500, color, marginBottom: 6 }}>
+            {econ.archetypeAnalysis[0].question}
+          </div>
+          <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 1.7 }}>
+            {econ.archetypeAnalysis[0].answer}
+          </div>
+        </div>
+      </div>
+
+      {/* ── PREMIUM: решта метрик ── */}
+      <PremiumBlock isPremium={isPremium}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr 1fr', gap: 10 }}>
+          <MetricCard label="ВВП на особу" value={econ.gdpPerCapita.value} unit={econ.gdpPerCapita.unit} color={color} />
+          <MetricCard label="Корупція" value={econ.corruptionIndex.value} unit={econ.corruptionIndex.unit} color={color} />
+          <MetricCard label={econ.humanDevelopment.unit} value={econ.humanDevelopment.value} unit="" color={color} />
+          <MetricCard label="Діаспора" value={econ.diaspora.value} unit={econ.diaspora.unit} color={color} />
+        </div>
+      </PremiumBlock>
+
+      {/* ── PREMIUM: ВВП 2014–2023 ── */}
+      <PremiumBlock isPremium={isPremium}>
+        <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px' }}>
+          <ChartLabel label="ВВП (млрд $) · 2014–2023" />
+          <ResponsiveContainer width="100%" height={180}>
+            <LineChart data={econ.gdpHistory}>
+              <XAxis dataKey="year" {...AXIS_PROPS} />
+              <YAxis {...AXIS_PROPS} />
+              <Tooltip {...TOOLTIP_STYLE} />
+              <ReferenceLine x={2014} stroke="rgba(255,255,255,0.2)" label={{ value: 'Майдан', fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} />
+              <ReferenceLine x={2022} stroke="#ED937B" strokeOpacity={0.5} label={{ value: 'Вторгнення', fill: '#ED937B', fontSize: 10 }} />
+              <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={{ fill: color, r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </PremiumBlock>
+
+      {/* ── PREMIUM: зарплата + інфляція ── */}
+      <PremiumBlock isPremium={isPremium}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
+          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px' }}>
+            <ChartLabel label="Мінімальна зарплата ($/міс)" />
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={econ.minWageHistory}>
+                <XAxis dataKey="year" {...AXIS_PROPS} />
+                <YAxis {...AXIS_PROPS} />
+                <Tooltip {...TOOLTIP_STYLE} />
+                <Bar dataKey="value" fill={color} opacity={0.8} radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px' }}>
+            <ChartLabel label="Інфляція (%)" />
+            <ResponsiveContainer width="100%" height={160}>
+              <LineChart data={econ.inflationHistory}>
+                <XAxis dataKey="year" {...AXIS_PROPS} />
+                <YAxis {...AXIS_PROPS} />
+                <Tooltip {...TOOLTIP_STYLE} />
+                <Line type="monotone" dataKey="value" stroke="#ED937B" strokeWidth={2} dot={{ fill: '#ED937B', r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </PremiumBlock>
+
+      {/* ── PREMIUM: безробіття ── */}
+      <PremiumBlock isPremium={isPremium}>
+        <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 16px' }}>
+          <ChartLabel label="Безробіття (%)" />
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={econ.unemploymentHistory}>
+              <XAxis dataKey="year" {...AXIS_PROPS} />
+              <YAxis {...AXIS_PROPS} />
+              <Tooltip {...TOOLTIP_STYLE} />
+              <Bar dataKey="value" fill="#ED937B" opacity={0.7} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </PremiumBlock>
+
+      {/* ── PREMIUM: структура + експорт ── */}
+      <PremiumBlock isPremium={isPremium}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
+          {/* Структура економіки */}
+          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px' }}>
+            <ChartLabel label="Структура економіки" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {econ.economicSectors.map(s => (
+                <div key={s.name}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{s.name}</span>
+                    <span style={{ fontSize: 12, color: s.color, fontWeight: 600 }}>{s.value}%</span>
+                  </div>
+                  <div style={{ height: 6, background: 'rgba(255,255,255,0.07)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ width: `${s.value}%`, height: '100%', background: s.color, borderRadius: 3 }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Топ експорт */}
+          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px' }}>
+            <ChartLabel label="Топ-5 експорту" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {econ.topExports.map(e => (
+                <div key={e.name}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{e.name}</span>
+                    <span style={{ fontSize: 12, color, fontWeight: 600 }}>{e.percent}%</span>
+                  </div>
+                  <div style={{ height: 6, background: 'rgba(255,255,255,0.07)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ width: `${e.percent}%`, height: '100%', background: color, borderRadius: 3 }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </PremiumBlock>
+
+      {/* ── PREMIUM: решта архетип питань ── */}
+      <PremiumBlock isPremium={isPremium}>
+        <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+            <span style={{ fontSize: 16 }}>💡</span>
+            <span style={{ fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
+              Економіка через архетип
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {econ.archetypeAnalysis.slice(1).map((item, i) => (
+              <div
+                key={i}
+                style={{
+                  paddingBottom: i < econ.archetypeAnalysis.length - 2 ? 16 : 0,
+                  marginBottom: i < econ.archetypeAnalysis.length - 2 ? 16 : 0,
+                  borderBottom: i < econ.archetypeAnalysis.length - 2 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 500, color, marginBottom: 6 }}>{item.question}</div>
+                <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 1.7 }}>{item.answer}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </PremiumBlock>
+
+      {/* ── CTA якщо не premium ── */}
+      {!isPremium && (
+        <div style={{
+          border: `1px solid ${color}33`, borderRadius: 12,
+          padding: 24, textAlign: 'center', marginTop: 8,
+        }}>
+          <div style={{ fontSize: 15, fontWeight: 500, color: 'white', marginBottom: 8 }}>
+            Повний економічний аналіз
+          </div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 20, lineHeight: 1.6 }}>
+            Динаміка зарплат · Інфляція · Безробіття · Структура економіки · Архетип аналіз
+          </div>
+          <Link href="/profile" style={{
+            display: 'block', background: color, color: '#04080f',
+            padding: '12px 28px', borderRadius: 8,
+            fontSize: 14, fontWeight: 500, textDecoration: 'none',
+            textAlign: 'center',
+          }}>
+            Розблокувати Premium →
+          </Link>
+        </div>
+      )}
+
     </div>
   )
 }

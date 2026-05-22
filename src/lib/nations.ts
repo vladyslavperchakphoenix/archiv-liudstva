@@ -51,12 +51,21 @@ export type NationData = {
     isPremium: boolean
   }>
   economics?: {
-    gdp: string
-    gdpPerCapita: string
-    population: string
-    happinessIndex: string
-    corruptionIndex: string
-    humanDevelopment: string
+    gdp: { value: number; unit: string; year: number }
+    gdpPerCapita: { value: number; unit: string; year: number }
+    minWage: { value: number; unit: string; year: number }
+    population: { value: number; unit: string; year: number }
+    diaspora: { value: number; unit: string; desc: string }
+    happinessRank: { value: number; unit: string }
+    corruptionIndex: { value: number; unit: string }
+    humanDevelopment: { value: number; unit: string }
+    gdpHistory: { year: number; value: number }[]
+    minWageHistory: { year: number; value: number }[]
+    inflationHistory: { year: number; value: number }[]
+    unemploymentHistory: { year: number; value: number }[]
+    economicSectors: { name: string; value: number; color: string }[]
+    topExports: { name: string; percent: number }[]
+    archetypeAnalysis: { question: string; answer: string }[]
   }
   tabs?: {
     philosophy?: TabSectionData
@@ -307,12 +316,68 @@ export const NATIONS_DATA: Record<string, NationData> = {
       },
     ],
     economics: {
-      gdp: '$160 млрд',
-      gdpPerCapita: '$4,300',
-      population: '37 млн',
-      happinessIndex: '5.1 / 10',
-      corruptionIndex: '36 / 100',
-      humanDevelopment: '0.773',
+      gdp:              { value: 160,   unit: 'млрд $',  year: 2023 },
+      gdpPerCapita:     { value: 4300,  unit: '$',       year: 2023 },
+      minWage:          { value: 212,   unit: '$/міс',   year: 2023 },
+      population:       { value: 37,    unit: 'млн',     year: 2023 },
+      diaspora:         { value: 6.5,   unit: 'млн',     desc: 'живуть за кордоном' },
+      happinessRank:    { value: 5.1,   unit: '/ 10' },
+      corruptionIndex:  { value: 36,    unit: '/ 100' },
+      humanDevelopment: { value: 0.773, unit: 'ІЛР' },
+      gdpHistory: [
+        { year: 2014, value: 131 }, { year: 2015, value: 90 },
+        { year: 2016, value: 93 },  { year: 2017, value: 112 },
+        { year: 2018, value: 130 }, { year: 2019, value: 153 },
+        { year: 2020, value: 155 }, { year: 2021, value: 200 },
+        { year: 2022, value: 160 }, { year: 2023, value: 160 },
+      ],
+      minWageHistory: [
+        { year: 2018, value: 118 }, { year: 2019, value: 139 },
+        { year: 2020, value: 175 }, { year: 2021, value: 181 },
+        { year: 2022, value: 195 }, { year: 2023, value: 212 },
+      ],
+      inflationHistory: [
+        { year: 2018, value: 10.9 }, { year: 2019, value: 7.9 },
+        { year: 2020, value: 2.7 },  { year: 2021, value: 9.4 },
+        { year: 2022, value: 26.6 }, { year: 2023, value: 12.1 },
+      ],
+      unemploymentHistory: [
+        { year: 2018, value: 8.8 },  { year: 2019, value: 8.2 },
+        { year: 2020, value: 9.9 },  { year: 2021, value: 9.8 },
+        { year: 2022, value: 25.0 }, { year: 2023, value: 18.7 },
+      ],
+      economicSectors: [
+        { name: 'Послуги',       value: 55, color: '#c8a84b' },
+        { name: 'Промисловість', value: 18, color: '#ED937B' },
+        { name: 'Агро',          value: 12, color: '#5DCAA5' },
+        { name: 'IT',            value: 5,  color: '#378ADD' },
+        { name: 'Інше',          value: 10, color: '#85b7eb' },
+      ],
+      topExports: [
+        { name: 'Зерно та олія',      percent: 28 },
+        { name: 'Метали',             percent: 22 },
+        { name: 'IT послуги',         percent: 11 },
+        { name: 'Хімічна продукція',  percent: 8  },
+        { name: 'Деревина',           percent: 5  },
+      ],
+      archetypeAnalysis: [
+        {
+          question: 'Чому корупція саме 36/100?',
+          answer: 'Отаманщина в дії — кожен новий керівник будує власну мережу лояльності замість розвитку інституцій. Держава сприймається як чужа (бо 300 років нею керували інші) — тому красти в неї не соромно.',
+        },
+        {
+          question: 'Чому 6.5 млн живуть за кордоном?',
+          answer: 'Воля — концепт активний. Коли вдома немає умов для реалізації волі — українець іде шукати їх деінде. Польща, Чехія, Німеччина отримали мільйони кваліфікованих людей які просто хотіли нормально працювати.',
+        },
+        {
+          question: 'Як війна змінила економіку?',
+          answer: 'ВВП впав з $200 млрд до $160 млрд у 2022. Але IT-сектор виріс — бо ноутбук можна взяти в бомбосховище. Волонтерська економіка замінила державну там де держава не встигала. 400+ іноземних компаній пішли з Росії і частина прийшла в Україну.',
+        },
+        {
+          question: 'Чому IT став головною надією?',
+          answer: 'IT — єдина галузь де горизонтальна самоорганізація є перевагою. Не потрібна земля, заводи, дозволи. Потрібні мізки і інтернет. $7.3 млрд експорту IT послуг у 2021 — це Воля в цифровому вимірі.',
+        },
+      ],
     },
     tabs: {
       philosophy: {
