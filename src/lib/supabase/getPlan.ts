@@ -1,15 +1,21 @@
 import { createClient } from '@/lib/supabase/client'
 
 export async function getUserPlan(): Promise<'free' | 'premium'> {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return 'free'
+  try {
+    const supabase = createClient()
 
-  const { data } = await supabase
-    .from('profiles')
-    .select('plan')
-    .eq('id', user.id)
-    .single()
+    // getSession reads locally — works without network round-trip
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) return 'free'
 
-  return data?.plan || 'free'
+    const { data } = await supabase
+      .from('profiles')
+      .select('plan')
+      .eq('id', session.user.id)
+      .single()
+
+    return (data?.plan === 'premium') ? 'premium' : 'free'
+  } catch {
+    return 'free'
+  }
 }

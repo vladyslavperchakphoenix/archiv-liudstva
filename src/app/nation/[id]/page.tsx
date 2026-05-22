@@ -3,8 +3,13 @@
 import { use, useState, useEffect } from 'react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { NATIONS_DATA } from '@/lib/nations'
+import { NATIONS_DATA, type InfluenceLink } from '@/lib/nations'
 import { getUserPlan } from '@/lib/supabase/getPlan'
+import { createClient } from '@/lib/supabase/client'
+import {
+  LineChart, Line, BarChart, Bar,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine,
+} from 'recharts'
 
 const FREE_COLOR = '#4ade80'
 
@@ -19,12 +24,108 @@ const TABS = [
   { id: 'memes',      label: 'Меми' },
 ]
 
+function renderBlock(block: any, nationColor: string, isPremium: boolean) {
+  const content = (
+    <div key={block.id} style={{ marginBottom: 28 }}>
+      {block.title && (
+        <p style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: 14 }}>
+          {block.title}
+        </p>
+      )}
+
+      {block.content_type === 'metrics' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {block.data.items.map((item: any, i: number) => (
+            <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 16 }}>
+              <div style={{ fontSize: 22, fontWeight: 300, color: nationColor, marginBottom: 4 }}>{item.value}</div>
+              <div style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>{item.label}</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>{item.desc}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {block.content_type === 'chart_line' && (
+        <ResponsiveContainer width="100%" height={180}>
+          <LineChart data={block.data.series}>
+            <XAxis dataKey="year" stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
+            <YAxis stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
+            <Tooltip contentStyle={{ background: '#0d1628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }} labelStyle={{ color: 'white' }} />
+            {block.data.annotations?.map((a: any) => (
+              <ReferenceLine key={a.x} x={a.x} stroke={a.color} strokeDasharray="4 4" label={{ value: a.label, fill: a.color, fontSize: 9 }} />
+            ))}
+            <Line type="monotone" dataKey="value" stroke={block.data.color || nationColor} strokeWidth={2} dot={{ fill: block.data.color || nationColor, r: 3 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      )}
+
+      {block.content_type === 'chart_bar' && (
+        <ResponsiveContainer width="100%" height={160}>
+          <BarChart data={block.data.series}>
+            <XAxis dataKey="year" stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
+            <YAxis stroke="rgba(255,255,255,0.15)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
+            <Tooltip contentStyle={{ background: '#0d1628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }} />
+            <Bar dataKey="value" fill={block.data.color || nationColor} opacity={0.8} radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+
+      {block.content_type === 'list' && (
+        <div>
+          {block.data.items.map((item: any, i: number) => (
+            <div key={i} style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>{item.name}</span>
+                <span style={{ fontSize: 13, color: item.color || block.data.color || nationColor, fontWeight: 500 }}>{item.value}%</span>
+              </div>
+              <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2 }}>
+                <div style={{ width: `${item.value}%`, height: '100%', background: item.color || block.data.color || nationColor, borderRadius: 2, opacity: 0.8 }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {block.content_type === 'text' && block.data?.paragraphs && (
+        <div>
+          {block.data.paragraphs.map((p: any, i: number) => (
+            <div key={i} style={{ paddingBottom: 16, marginBottom: 16, borderBottom: i < block.data.paragraphs.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+              <p style={{ fontSize: 13, fontWeight: 500, color: nationColor, marginBottom: 6 }}>{p.question}</p>
+              <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 1.7 }}>{p.answer}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {block.content_type === 'text' && block.body && (
+        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 1.7 }}>{block.body}</p>
+      )}
+    </div>
+  )
+
+  if (block.is_premium && !isPremium) {
+    return (
+      <div key={block.id} style={{ position: 'relative', marginBottom: 28 }}>
+        <div style={{ opacity: 0.15, pointerEvents: 'none', userSelect: 'none' }}>
+          {content}
+        </div>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(4,8,15,0.7)', borderRadius: 12 }}>
+          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>🔒 Premium</span>
+        </div>
+      </div>
+    )
+  }
+
+  return content
+}
+
 
 export default function NationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const [isMobile, setIsMobile]   = useState(false)
-  const [userPlan, setUserPlan]   = useState<'free' | 'premium'>('free')
-  const [activeTab, setActiveTab] = useState('overview')
+  const [isMobile, setIsMobile]     = useState(false)
+  const [userPlan, setUserPlan]     = useState<'free' | 'premium'>('free')
+  const [activeTab, setActiveTab]   = useState('overview')
+  const [tabContent, setTabContent] = useState<any[]>([])
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
@@ -36,6 +137,20 @@ export default function NationPage({ params }: { params: Promise<{ id: string }>
   useEffect(() => {
     getUserPlan().then(setUserPlan)
   }, [])
+
+  useEffect(() => {
+    const loadTabContent = async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('nation_tabs')
+        .select('*')
+        .eq('nation_id', id)
+        .eq('tab_id', activeTab)
+        .order('sort_order')
+      if (data) setTabContent(data)
+    }
+    loadTabContent()
+  }, [id, activeTab])
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search)
@@ -233,18 +348,9 @@ export default function NationPage({ params }: { params: Promise<{ id: string }>
                     }} />
                   )}
                   {nation.matrix.slice(3).map((m, i) => (
-                    isPremium ? (
-                      <MatrixRow key={m.key} item={m} color={c} index={i + 3} />
-                    ) : (
-                      <div key={m.key} style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden' }}>
-                        <MatrixRow item={m} color={c} index={i + 3} />
-                        <div style={{
-                          position: 'absolute', inset: 0,
-                          backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
-                          background: 'rgba(4,8,15,0.6)', borderRadius: '10px', pointerEvents: 'none',
-                        }} />
-                      </div>
-                    )
+                    <div key={m.key} style={{ opacity: isPremium ? 1 : 0.25, pointerEvents: isPremium ? 'auto' : 'none' }}>
+                      <MatrixRow item={m} color={c} index={i + 3} />
+                    </div>
                   ))}
                 </div>
               </section>
@@ -288,8 +394,7 @@ export default function NationPage({ params }: { params: Promise<{ id: string }>
                         {data.others.map(name => (
                           <div key={name} style={{
                             fontSize: '12px', color: 'rgba(255,255,255,0.5)',
-                            filter: isPremium ? 'none' : 'blur(3px)',
-                            opacity: isPremium ? 1 : 0.35,
+                            opacity: isPremium ? 1 : 0.22,
                             userSelect: isPremium ? 'auto' : 'none',
                           }}>{name}</div>
                         ))}
@@ -359,8 +464,19 @@ export default function NationPage({ params }: { params: Promise<{ id: string }>
           {/* ── ЕКОНОМІКА ─────────────────────────────────────────────── */}
           {activeTab === 'economics' && (
             <section style={{ paddingBottom: '40px' }}>
-              {nation.economics ? (
-                <EconomicsTab econ={nation.economics} color={c} isPremium={isPremium} isMobile={isMobile} nationId={id} />
+              {tabContent.length > 0 ? (
+                <div>
+                  {tabContent.map(block => renderBlock(block, c, isPremium))}
+                  {!isPremium && tabContent.some((b: any) => b.is_premium) && (
+                    <div style={{ border: `1px solid ${c}33`, borderRadius: 12, padding: 24, textAlign: 'center', marginTop: 8 }}>
+                      <p style={{ fontSize: 15, fontWeight: 500, color: 'white', marginBottom: 8 }}>Повний економічний аналіз</p>
+                      <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 20, lineHeight: 1.6 }}>Графіки динаміки · Структура · Архетип аналіз</p>
+                      <Link href="/profile" style={{ display: 'block', background: c, color: '#04080f', padding: '12px 28px', borderRadius: 8, fontSize: 14, fontWeight: 500, textAlign: 'center', textDecoration: 'none' }}>
+                        Розблокувати Premium →
+                      </Link>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div style={{ padding: '60px 0', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '14px' }}>
                   Економічні дані скоро з'являться
@@ -392,14 +508,333 @@ export default function NationPage({ params }: { params: Promise<{ id: string }>
   )
 }
 
-// ─── TabContent ─────────────────────────────────────────────────────────────
+// ─── TabContent helpers (defined before TabContent for webpack HMR) ───────────
+
+type RichTabItem = {
+  name: string
+  dates?: string
+  tag?: string
+  core?: string
+  quote?: string
+  quoteSource?: string
+  desc: string
+  context?: string
+  isPremium: boolean
+}
+
+function InfluenceTimelineSVG({
+  items,
+  links,
+  color,
+}: {
+  items: RichTabItem[]
+  links: InfluenceLink[]
+  color: string
+}) {
+  const SPACING = 68
+  const PAD_TOP = 28
+  const W = 280
+  const nodeX = 12
+  const arcOriginX = 146
+
+  const sorted = [...items].sort((a, b) => {
+    const yA = parseInt(a.dates?.split('–')[0] ?? '9999')
+    const yB = parseInt(b.dates?.split('–')[0] ?? '9999')
+    return yA - yB
+  })
+
+  const H = PAD_TOP + (sorted.length - 1) * SPACING + 44
+
+  const getY = (name: string) => {
+    const idx = sorted.findIndex(p => p.name === name)
+    return idx >= 0 ? PAD_TOP + idx * SPACING : -1
+  }
+
+  const preparedLinks = links
+    .map(l => ({ ...l, fy: getY(l.from), ty: getY(l.to) }))
+    .filter(l => l.fy >= 0 && l.ty >= 0)
+
+  const laneRanges: Array<[number, number][]> = []
+  const linkLanes = new Map<string, number>()
+
+  const bySpan = [...preparedLinks].sort((a, b) =>
+    Math.abs(a.ty - a.fy) - Math.abs(b.ty - b.fy)
+  )
+  for (const link of bySpan) {
+    const key = `${link.from}→${link.to}`
+    const lo = Math.min(link.fy, link.ty)
+    const hi = Math.max(link.fy, link.ty)
+    let lane = 0
+    while (lane < 10) {
+      if (!laneRanges[lane]) { laneRanges[lane] = []; break }
+      const conflict = laneRanges[lane].some(([a, b]) => !(hi < a || lo > b))
+      if (!conflict) break
+      lane++
+    }
+    if (!laneRanges[lane]) laneRanges[lane] = []
+    laneRanges[lane].push([lo, hi])
+    linkLanes.set(key, lane)
+  }
+
+  const getBend = (lane: number) => 24 + lane * 24
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{ display: 'block', maxWidth: '100%' }}>
+      <line x1={nodeX} y1={PAD_TOP - 14} x2={nodeX} y2={H - 22}
+        stroke="rgba(255,255,255,0.1)" strokeWidth={1} />
+
+      {sorted.map((item, i) => {
+        const y = PAD_TOP + i * SPACING
+        const dim = item.isPremium
+        return (
+          <g key={item.name}>
+            <circle cx={nodeX} cy={y} r={5} fill={dim ? `${color}44` : color} />
+            <text x={nodeX + 15} y={y + 5}
+              fill={dim ? 'rgba(255,255,255,0.38)' : 'rgba(255,255,255,0.88)'}
+              fontSize={11.5} fontWeight={dim ? '400' : '500'}>
+              {item.name.split(' ').pop()}
+            </text>
+            {item.dates && (
+              <text x={nodeX + 15} y={y + 14} fill="rgba(255,255,255,0.22)" fontSize={8}>
+                {item.dates}
+              </text>
+            )}
+            {item.tag && (
+              <text x={nodeX + 15} y={y + 26}
+                fill={dim ? `${color}44` : `${color}90`}
+                fontSize={7.5} fontStyle="italic">
+                {item.tag}
+              </text>
+            )}
+          </g>
+        )
+      })}
+
+      {preparedLinks.map(link => {
+        const key = `${link.from}→${link.to}`
+        const lane = linkLanes.get(key) ?? 0
+        const bend = getBend(lane)
+        const { fy, ty, type } = link
+        const maxX = arcOriginX + bend
+        const arcColor =
+          type === 'mutual'   ? '#ED937B' :
+          type === 'indirect' ? `${color}55` : color
+        const dashArray = type === 'indirect' ? '4 3' : undefined
+        const d = `M ${arcOriginX} ${fy} C ${maxX} ${fy} ${maxX} ${ty} ${arcOriginX} ${ty}`
+        const aSize = 5
+        return (
+          <g key={key} opacity={0.8}>
+            <path d={d} fill="none" stroke={arcColor} strokeWidth={1.5} strokeDasharray={dashArray} />
+            {type !== 'mutual' && (
+              <polygon
+                points={`${arcOriginX},${ty} ${arcOriginX + aSize},${ty - aSize / 2} ${arcOriginX + aSize},${ty + aSize / 2}`}
+                fill={arcColor}
+              />
+            )}
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+function PhilosophyInfluenceMap({
+  items,
+  influenceMap,
+  color,
+}: {
+  items: RichTabItem[]
+  influenceMap: { links: InfluenceLink[]; insight: string }
+  color: string
+}) {
+  const { links, insight } = influenceMap
+  const directCount   = links.filter(l => l.type === 'direct').length
+  const indirectCount = links.filter(l => l.type === 'indirect').length
+  const mutualCount   = links.filter(l => l.type === 'mutual').length
+
+  return (
+    <div style={{ marginBottom: 32 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+        <div style={{ width: 3, height: 18, borderRadius: 2, background: 'rgba(255,255,255,0.2)' }} />
+        <span style={{ fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
+          Карта впливів
+        </span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 18 }}>
+        {[
+          { val: items.length, label: 'мислителів' },
+          { val: links.length, label: "зв'язків" },
+          { val: `${directCount} / ${indirectCount} / ${mutualCount}`, label: 'прям · непр · взаєм', small: true },
+        ].map(({ val, label, small }) => (
+          <div key={label} style={{
+            background: 'rgba(255,255,255,0.025)',
+            border: '1px solid rgba(255,255,255,0.07)',
+            borderRadius: 10, padding: '13px 10px', textAlign: 'center',
+          }}>
+            <div style={{ fontSize: small ? 13 : 22, fontWeight: 600, color, letterSpacing: '-0.01em', lineHeight: 1.2 }}>
+              {val}
+            </div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.06em', marginTop: 4, textTransform: 'uppercase' }}>
+              {label}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{
+        background: 'rgba(255,255,255,0.015)',
+        border: '1px solid rgba(255,255,255,0.06)',
+        borderRadius: 12, padding: '20px 16px', marginBottom: 16,
+      }}>
+        <InfluenceTimelineSVG items={items} links={links} color={color} />
+        <div style={{ display: 'flex', gap: 16, marginTop: 14, flexWrap: 'wrap' }}>
+          {[
+            { label: 'Прямий вплив', clr: color },
+            { label: 'Непрямий',     clr: `${color}55` },
+            { label: 'Взаємний',     clr: '#ED937B' },
+          ].map(({ label, clr }) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 18, height: 2, background: clr, borderRadius: 1 }} />
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.32)' }}>{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{
+        background: `${color}0a`, border: `1px solid ${color}28`,
+        borderRadius: 12, padding: '16px 18px',
+      }}>
+        <div style={{ fontSize: 9, letterSpacing: '0.18em', textTransform: 'uppercase', color, fontWeight: 700, marginBottom: 8 }}>
+          Ключовий інсайт
+        </div>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.68)', lineHeight: 1.7 }}>
+          {insight}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TabItemCard({
+  item, index, color, blurred,
+}: {
+  item: RichTabItem
+  index: number
+  color: string
+  blurred: boolean
+}) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div
+      onClick={() => !blurred && setOpen(o => !o)}
+      style={{
+        background: 'rgba(255,255,255,0.025)',
+        border: `1px solid ${open && !blurred ? color + '40' : 'rgba(255,255,255,0.06)'}`,
+        borderRadius: '12px', padding: '16px',
+        opacity: blurred ? 0.5 : 1,
+        cursor: blurred ? 'default' : 'pointer',
+        transition: 'border-color 0.15s',
+      }}
+    >
+      <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+        <div style={{
+          width: '28px', height: '28px', flexShrink: 0,
+          borderRadius: '7px', background: `${color}12`,
+          border: `1px solid ${color}22`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '12px', fontWeight: 700, color,
+        }}>
+          {index + 1}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+            <span style={{ color: 'white', fontSize: '14px', fontWeight: 500 }}>{item.name}</span>
+            {item.dates && (
+              <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: '11px' }}>{item.dates}</span>
+            )}
+          </div>
+          {item.tag && (
+            <span style={{
+              display: 'inline-block',
+              padding: '2px 9px', borderRadius: '100px',
+              border: `1px solid ${color}35`, background: `${color}0d`,
+              fontSize: '10px', letterSpacing: '0.06em', color,
+              marginBottom: item.core ? '6px' : '0',
+            }}>
+              {item.tag}
+            </span>
+          )}
+          {item.core && (
+            <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '12px', fontStyle: 'italic', marginTop: '4px' }}>
+              {item.core}
+            </div>
+          )}
+        </div>
+        {!blurred && (
+          <svg
+            width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="rgba(255,255,255,0.3)" strokeWidth="2"
+            strokeLinecap="round" strokeLinejoin="round"
+            style={{
+              flexShrink: 0, marginTop: '7px',
+              transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s',
+            }}
+          >
+            <path d="m6 9 6 6 6-6"/>
+          </svg>
+        )}
+      </div>
+
+      {open && !blurred && (
+        <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', lineHeight: 1.65 }}>
+            {item.desc}
+          </div>
+          {item.quote && (
+            <div style={{ margin: '16px 0', paddingLeft: '14px', borderLeft: `2px solid ${color}60` }}>
+              <div style={{ color: 'rgba(255,255,255,0.82)', fontSize: '14px', fontStyle: 'italic', lineHeight: 1.6, marginBottom: '6px' }}>
+                «{item.quote}»
+              </div>
+              {item.quoteSource && (
+                <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px' }}>— {item.quoteSource}</div>
+              )}
+            </div>
+          )}
+          {item.context && (
+            <div style={{
+              marginTop: '14px', padding: '14px 16px',
+              background: `${color}0d`, border: `1px solid ${color}25`,
+              borderRadius: '8px',
+            }}>
+              <div style={{
+                fontSize: '9px', letterSpacing: '0.18em', textTransform: 'uppercase',
+                color, fontWeight: 700, marginBottom: '8px',
+              }}>
+                Через призму архетипу
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: '13px', lineHeight: 1.65 }}>
+                {item.context}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── TabContent ───────────────────────────────────────────────────────────────
 
 function TabContent({
   data,
   isPremiumUser,
   nationColor,
 }: {
-  data: { intro: string; items: { name: string; desc: string; isPremium: boolean }[] } | undefined
+  data: { intro: string; items: RichTabItem[]; influenceMap?: { links: InfluenceLink[]; insight: string } } | undefined
   isPremiumUser: boolean
   nationColor: string
 }) {
@@ -427,23 +862,26 @@ function TabContent({
         {data.intro}
       </p>
 
+      {data.influenceMap && (
+        <PhilosophyInfluenceMap
+          items={data.items}
+          influenceMap={data.influenceMap}
+          color={nationColor}
+        />
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {freeItems.map((item, i) => (
           <TabItemCard key={item.name} item={item} index={i} color={nationColor} blurred={false} />
         ))}
         {premiumItems.map((item, i) => (
-          isPremiumUser ? (
-            <TabItemCard key={item.name} item={item} index={freeItems.length + i} color={nationColor} blurred={false} />
-          ) : (
-            <div key={item.name} style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden' }}>
-              <TabItemCard item={item} index={freeItems.length + i} color={nationColor} blurred />
-              <div style={{
-                position: 'absolute', inset: 0,
-                backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
-                background: 'rgba(4,8,15,0.55)', borderRadius: '12px', pointerEvents: 'none',
-              }} />
-            </div>
-          )
+          <TabItemCard
+            key={item.name}
+            item={item}
+            index={freeItems.length + i}
+            color={nationColor}
+            blurred={!isPremiumUser}
+          />
         ))}
       </div>
 
@@ -472,43 +910,6 @@ function TabContent({
           </Link>
         </div>
       )}
-    </div>
-  )
-}
-
-function TabItemCard({
-  item, index, color, blurred,
-}: {
-  item: { name: string; desc: string; isPremium: boolean }
-  index: number
-  color: string
-  blurred: boolean
-}) {
-  return (
-    <div style={{
-      display: 'flex', gap: '14px', alignItems: 'flex-start',
-      background: 'rgba(255,255,255,0.025)',
-      border: '1px solid rgba(255,255,255,0.06)',
-      borderRadius: '12px', padding: '16px',
-      opacity: blurred ? 0.5 : 1,
-    }}>
-      <div style={{
-        width: '28px', height: '28px', flexShrink: 0,
-        borderRadius: '7px', background: `${color}12`,
-        border: `1px solid ${color}22`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '12px', fontWeight: 700, color,
-      }}>
-        {index + 1}
-      </div>
-      <div>
-        <div style={{ color: 'white', fontSize: '14px', fontWeight: 500, marginBottom: '4px' }}>
-          {item.name}
-        </div>
-        <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '13px', lineHeight: 1.55 }}>
-          {item.desc}
-        </div>
-      </div>
     </div>
   )
 }
@@ -968,8 +1369,7 @@ function PersonCard({ person, color, blurred }: {
       background: 'rgba(255,255,255,0.025)',
       border: '1px solid rgba(255,255,255,0.06)',
       borderRadius: '12px', padding: '18px',
-      filter: blurred ? 'blur(3px)' : 'none',
-      opacity: blurred ? 0.4 : 1,
+      opacity: blurred ? 0.28 : 1,
       userSelect: blurred ? 'none' : 'auto',
       pointerEvents: blurred ? 'none' : 'auto',
     }}>
