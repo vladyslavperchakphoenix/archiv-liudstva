@@ -316,16 +316,21 @@ export default function NationPage({ params }: { params: Promise<{ id: string }>
             </div>
 
             {/* ── TABS ── */}
-            <div style={{
-              display: 'flex',
-              gap: '8px',
-              overflowX: 'auto',
-              padding: '24px 0 0',
-              marginTop: '24px',
-              borderTop: '1px solid rgba(255,255,255,0.06)',
-              scrollbarWidth: 'none',
-              msOverflowStyle: 'none',
-            }}>
+            <div
+              className="tabs-scroll"
+              onWheel={(e) => { e.preventDefault(); e.currentTarget.scrollLeft += e.deltaY }}
+              style={{
+                display: 'flex',
+                gap: '8px',
+                overflowX: 'auto',
+                padding: '24px 0 8px',
+                marginTop: '24px',
+                borderTop: '1px solid rgba(255,255,255,0.06)',
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none',
+                WebkitOverflowScrolling: 'touch',
+              }}
+            >
               {[
                 { id: 'overview',   label: 'Огляд' },
                 { id: 'economics',  label: 'Економіка' },
