@@ -100,6 +100,59 @@ function renderBlock(block: any, nationColor: string, isPremium: boolean) {
       {block.content_type === 'text' && block.body && (
         <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 1.7 }}>{block.body}</p>
       )}
+
+      {block.content_type === 'timeline' && (
+        <div style={{ position: 'relative', paddingLeft: 24 }}>
+          <div style={{ position: 'absolute', left: 7, top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,0.1)' }} />
+          {block.data.events.map((event: any, i: number) => (
+            <div key={i} style={{ position: 'relative', marginBottom: 24 }}>
+              <div style={{ position: 'absolute', left: -21, top: 4, width: 10, height: 10, borderRadius: '50%', background: nationColor, border: '2px solid #04080f' }} />
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: nationColor, fontWeight: 500, flexShrink: 0 }}>{event.year}</span>
+                <span style={{ fontSize: 14, color: 'white', fontWeight: 500 }}>{event.title}</span>
+              </div>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, margin: 0 }}>{event.desc}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {block.content_type === 'influence_map' && (
+        <div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+            {block.data.nodes.map((node: any) => (
+              <div key={node.id} style={{
+                padding: '6px 14px', borderRadius: 20,
+                border: `1px solid ${node.color}`,
+                background: `${node.color}15`,
+                fontSize: 12, color: node.color,
+              }}>
+                {node.name} · {node.year}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {block.data.links.map((link: any, i: number) => {
+              const from = block.data.nodes.find((n: any) => n.id === link.from)
+              const to   = block.data.nodes.find((n: any) => n.id === link.to)
+              return (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '10px 14px',
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  borderRadius: 8,
+                }}>
+                  <span style={{ fontSize: 13, color: from?.color || nationColor }}>{from?.name}</span>
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>→</span>
+                  <span style={{ fontSize: 13, color: to?.color || nationColor }}>{to?.name}</span>
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginLeft: 'auto' }}>{link.desc}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 
@@ -489,14 +542,26 @@ export default function NationPage({ params }: { params: Promise<{ id: string }>
           {/* ── КОНТЕНТ ВКЛАДОК ───────────────────────────────────────── */}
           {(['philosophy', 'music', 'art', 'science', 'conflicts', 'memes'] as const).map(tabId => {
             if (activeTab !== tabId) return null
-            const data = nation.tabs?.[tabId]
             return (
               <section key={tabId} style={{ paddingBottom: '40px' }}>
-                <TabContent
-                  data={data}
-                  isPremiumUser={isPremium}
-                  nationColor={c}
-                />
+                {tabContent.length > 0 ? (
+                  <div>
+                    {tabContent.map(block => renderBlock(block, c, isPremium))}
+                    {!isPremium && tabContent.some((b: any) => b.is_premium) && (
+                      <div style={{ border: `1px solid ${c}33`, borderRadius: 12, padding: 24, textAlign: 'center', marginTop: 8 }}>
+                        <p style={{ fontSize: 15, fontWeight: 500, color: 'white', marginBottom: 8 }}>Повний архів</p>
+                        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 20, lineHeight: 1.6 }}>Відкрийте повний доступ до всіх розділів</p>
+                        <Link href="/profile" style={{ display: 'block', background: c, color: '#04080f', padding: '12px 28px', borderRadius: 8, fontSize: 14, fontWeight: 500, textAlign: 'center', textDecoration: 'none' }}>
+                          Розблокувати Premium →
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ padding: '60px 0', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '14px' }}>
+                    Контент для цієї вкладки скоро з'явиться
+                  </div>
+                )}
                 <CrossLinks currentId={id} activeTab={activeTab} color={c} />
               </section>
             )
