@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useState, useEffect } from 'react'
+import { use, useState, useEffect, useRef } from 'react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { NATIONS_DATA, type InfluenceLink } from '@/lib/nations'
@@ -226,6 +226,29 @@ export default function NationPage({ params }: { params: Promise<{ id: string }>
     window.history.replaceState({}, '', url.toString())
   }
 
+  const tabsRef    = useRef<HTMLDivElement>(null)
+  const isDragging = useRef(false)
+  const startX     = useRef(0)
+  const scrollLeft = useRef(0)
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    isDragging.current = true
+    startX.current     = e.pageX - (tabsRef.current?.offsetLeft || 0)
+    scrollLeft.current = tabsRef.current?.scrollLeft || 0
+    if (tabsRef.current) tabsRef.current.style.cursor = 'grabbing'
+  }
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging.current) return
+    e.preventDefault()
+    const x    = e.pageX - (tabsRef.current?.offsetLeft || 0)
+    const walk = (x - startX.current) * 1.5
+    if (tabsRef.current) tabsRef.current.scrollLeft = scrollLeft.current - walk
+  }
+  const onMouseUp = () => {
+    isDragging.current = false
+    if (tabsRef.current) tabsRef.current.style.cursor = 'grab'
+  }
+
   return (
     <>
       <div
@@ -321,8 +344,12 @@ export default function NationPage({ params }: { params: Promise<{ id: string }>
               .tabs-container { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
             <div
+              ref={tabsRef}
               className="tabs-container"
-              onWheel={(e) => { e.preventDefault(); e.currentTarget.scrollLeft += e.deltaY * 2 }}
+              onMouseDown={onMouseDown}
+              onMouseMove={onMouseMove}
+              onMouseUp={onMouseUp}
+              onMouseLeave={onMouseUp}
               style={{
                 display: 'flex',
                 gap: '8px',
@@ -331,6 +358,7 @@ export default function NationPage({ params }: { params: Promise<{ id: string }>
                 padding: '24px 0 8px',
                 marginBottom: '32px',
                 borderBottom: '1px solid rgba(255,255,255,0.06)',
+                cursor: 'grab',
               }}
             >
               {[
