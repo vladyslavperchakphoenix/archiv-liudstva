@@ -316,19 +316,21 @@ export default function NationPage({ params }: { params: Promise<{ id: string }>
             </div>
 
             {/* ── TABS ── */}
+            <style>{`
+              .tabs-container::-webkit-scrollbar { display: none; }
+              .tabs-container { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
             <div
-              className="tabs-scroll"
-              onWheel={(e) => { e.preventDefault(); e.currentTarget.scrollLeft += e.deltaY }}
+              className="tabs-container"
+              onWheel={(e) => { e.preventDefault(); e.currentTarget.scrollLeft += e.deltaY * 2 }}
               style={{
                 display: 'flex',
                 gap: '8px',
-                overflowX: 'auto',
-                padding: '24px 0 8px',
-                marginTop: '24px',
-                borderTop: '1px solid rgba(255,255,255,0.06)',
-                scrollbarWidth: 'none',
-                msOverflowStyle: 'none',
+                overflowX: 'scroll',
                 WebkitOverflowScrolling: 'touch',
+                padding: '24px 0 8px',
+                marginBottom: '32px',
+                borderBottom: '1px solid rgba(255,255,255,0.06)',
               }}
             >
               {[
@@ -343,7 +345,7 @@ export default function NationPage({ params }: { params: Promise<{ id: string }>
               ].map(tab => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => handleTabClick(tab.id)}
                   style={{
                     padding: '8px 18px',
                     borderRadius: '20px',
